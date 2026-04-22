@@ -5,10 +5,39 @@ and state transitions live here. The frontend only handles display.
 """
 from __future__ import annotations
 
+import json
 import math
+import os
 import random
 from copy import deepcopy
 from typing import Any
+
+# ── Optional Shapely for polygon-based country borders ────────────────────────
+try:
+    from shapely.geometry import Point, shape
+    from shapely.ops import nearest_points as _shapely_nearest
+    _SHAPELY = True
+except ImportError:
+    _SHAPELY = False
+
+_COUNTRY_BORDERS: dict[str, Any] = {}
+
+def _load_country_borders() -> None:
+    if not _SHAPELY:
+        return
+    path = os.path.join(os.path.dirname(__file__), "country_borders.json")
+    try:
+        with open(path) as f:
+            raw = json.load(f)
+        for iso, geom in raw.items():
+            _COUNTRY_BORDERS[iso] = shape(geom)
+        print(f"[GeoMaster] Loaded {len(_COUNTRY_BORDERS)} country border polygons")
+    except FileNotFoundError:
+        print("[GeoMaster] country_borders.json not found — using radius fallback")
+    except Exception as exc:
+        print(f"[GeoMaster] Border load error: {exc}")
+
+_load_country_borders()
 
 from data import (
     CITIES,
@@ -60,6 +89,30 @@ def distance_to_zone(
     if center_dist <= radius_km:
         return 0, True
     return center_dist - radius_km, False
+
+
+def _distance_to_country(lat: float, lng: float, iso: str) -> tuple[int | None, bool]:
+    """Return (distance_km, inside) using real country border polygon.
+
+    Returns (None, False) when no polygon is available so the caller can
+    fall back to the radius-based approach.
+    """
+    if not iso or not _COUNTRY_BORDERS:
+        return None, False
+
+    geom = _COUNTRY_BORDERS.get(iso.lower())
+    if geom is None:
+        return None, False
+
+    point = Point(lng, lat)  # shapely: (x=lng, y=lat)
+
+    if geom.contains(point):
+        return 0, True
+
+    # Nearest point on the polygon boundary in degree space, then haversine
+    nearest_pt = _shapely_nearest(geom, point)[0]
+    dist_km = haversine_km(lat, lng, nearest_pt.y, nearest_pt.x)
+    return dist_km, False
 
 
 # ─── Game state creation ───────────────────────────────────────────────────────
@@ -143,6 +196,7 @@ def build_question(mode: str, state: dict[str, Any]) -> dict[str, Any]:
         "answer_lng": item["lng"],
         "radius_km": item["radius_km"],
         "kind": item["kind"],
+        "answer_iso": item.get("iso"),  # present for country questions
     }
 
 
@@ -299,12 +353,17 @@ def evaluate_guess(
         lat = max(-90.0, min(90.0, lat))
         lng = max(-180.0, min(180.0, lng))
 
-        dist_km, inside = distance_to_zone(
-            lat=lat, lng=lng,
-            answer_lat=question["answer_lat"],
-            answer_lng=question["answer_lng"],
-            radius_km=question["radius_km"],
-        )
+        # Use real country polygon when available, radius as fallback
+        if question["mode"].startswith("country_") and question.get("answer_iso"):
+            dist_km, inside = _distance_to_country(lat, lng, question["answer_iso"])
+
+        if not question["mode"].startswith("country_") or dist_km is None:
+            dist_km, inside = distance_to_zone(
+                lat=lat, lng=lng,
+                answer_lat=question["answer_lat"],
+                answer_lng=question["answer_lng"],
+                radius_km=question["radius_km"],
+            )
 
         base_score = 5_000 if inside else score_from_distance(dist_km)
         detective_multiplier = (

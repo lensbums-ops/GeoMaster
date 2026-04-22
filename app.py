@@ -146,6 +146,7 @@ def _room_payload(room: dict[str, Any]) -> dict[str, Any]:
     viewer_index = _find_player_index(room, player_id)
     viewer = room["players"][viewer_index] if viewer_index is not None else None
 
+    votes = room.get("rematch_votes", [])
     return {
         "room_code": room["code"],
         "started": room["started"],
@@ -162,6 +163,9 @@ def _room_payload(room: dict[str, Any]) -> dict[str, Any]:
             for player in room["players"]
         ],
         "version": room.get("version", 0),
+        "rematch_votes": len(votes),
+        "rematch_total": len(room["players"]),
+        "viewer_voted_rematch": player_id in votes,
     }
 
 
@@ -531,6 +535,61 @@ def advance_round():
     _touch_game_state(state)
     room["game"] = state
     _touch_room(room)
+    return _ok(room)
+
+
+@app.post("/api/room/rounds")
+def set_rounds():
+    room = _get_room()
+    if not room:
+        return _err("No room found", 404)
+    if room["started"]:
+        return _err("Game already started")
+
+    player_id = _ensure_player_id()
+    if room["host_id"] != player_id:
+        return _err("Only the host can change the round count", 403)
+
+    payload = request.get_json(force=True)
+    try:
+        rounds = max(1, min(int(payload.get("rounds", 5)), 30))
+    except (ValueError, TypeError):
+        return _err("Invalid round count")
+
+    room["rounds"] = rounds
+    _touch_room(room)
+    return _ok(room)
+
+
+@app.post("/api/rematch")
+def rematch():
+    """Cast a rematch vote. Once all players have voted, reset to lobby."""
+    room = _get_room()
+    if not room:
+        return _err("No room found", 404)
+
+    state = room.get("game")
+    if not state or state.get("phase") != "finished":
+        return _err("Game is not finished yet")
+
+    player_id = _ensure_player_id()
+    if not _player_in_room(room, player_id):
+        return _err("You are not in this room", 403)
+
+    votes: list[str] = room.setdefault("rematch_votes", [])
+    if player_id not in votes:
+        votes.append(player_id)
+        _touch_room(room)
+
+    if len(votes) >= len(room["players"]):
+        for player in room["players"]:
+            player["joker_double"] = True
+            player["joker_peek"] = True
+        room["started"] = False
+        room["game"] = None
+        room["rematch_votes"] = []
+        _touch_room(room)
+
     return _ok(room)
 
 

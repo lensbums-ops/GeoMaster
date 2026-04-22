@@ -98,6 +98,11 @@ function applyPayload(payload) {
   currentRoom = payload.room;
   startSync();
 
+  // Keep rematch button in sync while on final screen
+  if (document.getElementById('screen-final').classList.contains('active')) {
+    updateRematchButton();
+  }
+
   if (!payload.room.started || !payload.game) {
     currentState = null;
     activeResultsKey = null;
@@ -727,18 +732,20 @@ async function showResultsScreen(state) {
         .openPopup();
       revealLayers.push(gm);
 
+      // Normalize answer lng relative to guess so the line takes the shorter path
+      const adjAnswerLng = nearLng(g.lng, q.answer_lng);
       bounds.push([g.lat, g.lng]);
       resultsMap.fitBounds(bounds, { padding: [40, 40], animate: true });
       await wait(450);
 
       if (!g.inside_target) {
-        const line = L.polyline([[g.lat, g.lng], [q.answer_lat, q.answer_lng]], {
+        const line = L.polyline([[g.lat, g.lng], [q.answer_lat, adjAnswerLng]], {
           color: g.player_color, weight: 2.5, opacity: 0.85, dashArray: '8,6',
         }).addTo(resultsMap);
         revealLayers.push(line);
 
         const midLat = (g.lat + q.answer_lat) / 2;
-        const midLng = (g.lng + q.answer_lng) / 2;
+        const midLng = (g.lng + adjAnswerLng) / 2;
         const distLabel = L.marker([midLat, midLng], {
           icon: L.divIcon({
             className: '',
@@ -830,6 +837,23 @@ function showFinalScreen(state) {
   }).join('');
 
   if (ranking.length > 1) spawnConfetti();
+  updateRematchButton();
+}
+
+function updateRematchButton() {
+  if (!currentRoom) return;
+  const btn = document.getElementById('play-again-btn');
+  const votes = currentRoom.rematch_votes ?? 0;
+  const total = currentRoom.rematch_total ?? 1;
+  const voted = currentRoom.viewer_voted_rematch ?? false;
+
+  if (voted) {
+    btn.disabled = true;
+    btn.textContent = votes >= total ? 'Starting…' : `Voted ✓  (${votes}/${total} ready)`;
+  } else {
+    btn.disabled = false;
+    btn.textContent = total === 1 ? 'Play Again' : `Play Again  (${votes}/${total} ready)`;
+  }
 }
 
 // ─── Animations ──────────────────────────────────────────────────────────────
@@ -922,6 +946,15 @@ async function revealDetectiveHint() {
 }
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
+
+// Normalize targetLng so the shorter arc relative to refLng is used (antimeridian fix).
+function nearLng(refLng, targetLng) {
+  let lng = targetLng;
+  while (lng - refLng > 180) lng -= 360;
+  while (refLng - lng > 180) lng += 360;
+  return lng;
+}
+
 function flagEmoji(iso) {
   return iso.toUpperCase().split('').map(c => String.fromCodePoint(c.charCodeAt(0) + 127397)).join('');
 }
@@ -1022,11 +1055,12 @@ document.getElementById('copy-room-btn').addEventListener('click', copyInviteLin
 document.getElementById('lobby-start-btn').addEventListener('click', startMatch);
 document.getElementById('leave-room-btn').addEventListener('click', leaveRoom);
 
-document.getElementById('lobby-round-options').addEventListener('click', e => {
+document.getElementById('lobby-round-options').addEventListener('click', async e => {
   const btn = e.target.closest('[data-rounds]');
-  if (!btn || currentRoom && !currentRoom.is_host) return;
-  document.querySelectorAll('#lobby-round-options .round-option').forEach(el => el.classList.remove('active'));
-  btn.classList.add('active');
+  if (!btn || (currentRoom && !currentRoom.is_host)) return;
+  const rounds = Number(btn.dataset.rounds);
+  const payload = await api('/api/room/rounds', 'POST', { rounds });
+  if (payload) applyPayload(payload);
 });
 
 document.getElementById('confirm-btn').addEventListener('click', async () => {
@@ -1051,7 +1085,10 @@ document.getElementById('next-round-btn').addEventListener('click', async () => 
   if (payload) applyPayload(payload);
 });
 
-document.getElementById('play-again-btn').addEventListener('click', leaveRoom);
+document.getElementById('play-again-btn').addEventListener('click', async () => {
+  const payload = await api('/api/rematch', 'POST', {});
+  if (payload) applyPayload(payload);
+});
 
 document.getElementById('back-start-btn').addEventListener('click', async () => {
   const payload = await api('/api/room/leave', 'POST', {}, { showErrors: false });
