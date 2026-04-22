@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GeoMaster 🌍</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div id="loading">
+  <div class="spinner"></div>
+  <h2>GeoMaster</h2>
+  <p>Loading world map...</p>
+</div>
+
+<!-- Toast notification -->
+<div id="toast"></div>
+
+<!-- ══════════════════════════════════════════════════════
+     START SCREEN
+     ══════════════════════════════════════════════════════ -->
+<div id="screen-start" class="screen">
+  <div class="start-box">
+    <div class="logo">🌍 GeoMaster</div>
+    <div class="logo-sub">How well do you know the world?</div>
+
+    <div class="player-inputs">
+      <div class="player-row"><div class="player-num p1">1</div><input type="text" id="p1name" placeholder="Player 1 name" maxlength="16"></div>
+      <div class="player-row"><div class="player-num p2">2</div><input type="text" id="p2name" placeholder="Player 2 (optional)" maxlength="16"></div>
+      <div class="player-row"><div class="player-num p3">3</div><input type="text" id="p3name" placeholder="Player 3 (optional)" maxlength="16"></div>
+      <div class="player-row"><div class="player-num p4">4</div><input type="text" id="p4name" placeholder="Player 4 (optional)" maxlength="16"></div>
+    </div>
+
+    <div class="settings-row">
+      <label>Number of rounds</label>
+      <select id="rounds-select">
+        <option value="5">5 rounds</option>
+        <option value="10" selected>10 rounds</option>
+        <option value="15">15 rounds</option>
+        <option value="20">20 rounds</option>
+      </select>
+    </div>
+
+    <button class="btn-primary" onclick="Game.start()">Start Game →</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     GAME SCREEN
+     ══════════════════════════════════════════════════════ -->
+<div id="screen-game" class="screen">
+
+  <!-- Left panel: clue -->
+  <div id="game-left">
+    <div id="mode-badge">Flag</div>
+    <div id="clue-title">Which country is this?</div>
+    <div id="clue-subtitle">Click on the map to place your guess</div>
+    <div id="clue-content"></div>
+    <button id="next-clue-btn" onclick="Game.revealNextClue()" style="display:none">Reveal next clue (−1000 pts)</button>
+    <div id="current-player-label">
+      It's <span id="current-player-name">Player 1</span>'s turn
+    </div>
+    <div id="scores-panel">
+      <div class="scores-title">Scores</div>
+      <div id="scores-list"></div>
+    </div>
+  </div>
+
+  <!-- Right panel: map -->
+  <div id="game-right">
+    <div id="top-bar">
+      <span id="round-label">Round 1 / 10</span>
+      <span id="timer-display">30</span>
+    </div>
+    <div id="map-container">
+      <svg id="world-map" width="860" height="500"></svg>
+      <svg id="map-overlay" width="860" height="500" style="position:absolute;top:0;left:0;pointer-events:none;"></svg>
+      <div id="click-hint">Click anywhere on the map to place your guess</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     ROUND RESULT SCREEN
+     ══════════════════════════════════════════════════════ -->
+<div id="screen-result" class="screen">
+  <div class="result-header">
+    <h2 id="result-title">Round Results</h2>
+    <p id="result-country">The answer was: France 🇫🇷</p>
+  </div>
+  <div id="result-map-container">
+    <svg id="result-map" width="700" height="380"></svg>
+    <svg id="result-overlay" width="700" height="380" style="position:absolute;top:0;left:0;pointer-events:none;"></svg>
+  </div>
+  <div id="result-scores"></div>
+  <button class="btn-primary" id="next-btn" onclick="Game.nextRound()">Next Round →</button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     FINAL SCREEN
+     ══════════════════════════════════════════════════════ -->
+<div id="screen-final" class="screen">
+  <div class="final-box">
+    <div class="final-title">🏆 Game Over!</div>
+    <div class="final-winner" id="final-winner-text"></div>
+    <div class="podium" id="podium"></div>
+    <div class="all-scores" id="all-scores"></div>
+    <button class="btn-primary" onclick="Game.reset()">Play Again</button>
+  </div>
+</div>
+
+<!-- D3 and TopoJSON from CDN (requires internet) -->
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+<script src="data.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

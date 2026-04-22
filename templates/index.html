@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GeoMaster</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <style>
+    #toast {
+      position: fixed; top: 20px; left: 50%;
+      transform: translateX(-50%) translateY(-60px);
+      background: #131c2e; border: 1px solid rgba(255,255,255,.12);
+      border-radius: 10px; padding: 10px 20px; font-size: 14px;
+      z-index: 99999; transition: transform .3s ease; pointer-events: none;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════ START ════════════════════════════════════ -->
+<div id="screen-start" class="screen active">
+  <div class="start-layout">
+
+    <div class="start-left">
+      <div class="globe-wrap">
+        <div class="globe">
+          <div class="globe-continents"></div>
+          <div class="globe-shine"></div>
+        </div>
+        <div class="globe-orbit"></div>
+      </div>
+      <div class="start-logo">Geography Challenge</div>
+      <div class="start-title">Geo<span>Master</span></div>
+      <div class="start-tagline">Guess the country · Beat your friends</div>
+
+      <div class="rules-box">
+        <div class="rules-title">How to play</div>
+        <div class="rule-row">
+          <span class="rule-icon">🗺️</span>
+          <span>Each round one player picks a clue type. Everyone guesses privately — click the correct country or city on the map.</span>
+        </div>
+        <div class="rule-row">
+          <span class="rule-icon">📍</span>
+          <span>The closer your pin to the target, the more points you earn. A perfect hit scores <strong>5,000 pts</strong>. Over 10,000 km away scores 0.</span>
+        </div>
+        <div class="rule-row">
+          <span class="rule-icon">⏱️</span>
+          <span>You have <strong>30 seconds</strong> per turn. Miss the timer and a phantom marker drops somewhere in the ocean — plus a 500 pt penalty.</span>
+        </div>
+        <div class="rule-row">
+          <span class="rule-icon">🔥</span>
+          <span><strong>Streak bonus:</strong> 3 rounds under 1,000 km in a row earns +500 pts and sets you on fire.</span>
+        </div>
+        <div class="rule-row">
+          <span class="rule-icon">🃏</span>
+          <span><strong>Jokers:</strong> each player has two — <em>Double Points</em> (×2 your score) and <em>Peek</em> (see the target for 3 seconds). Use them wisely, once per game each.</span>
+        </div>
+        <div class="rule-row">
+          <span class="rule-icon">🏆</span>
+          <span>After all rounds the player with the most points wins. Scores are hidden until the reveal — no peeking!</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="start-right">
+      <div class="setup-label">Online Multiplayer</div>
+      <div class="setup-heading">Create or join a room</div>
+      <div class="setup-sub">One browser per player · Python backend · room code based</div>
+
+      <div class="field">
+        <label>Your Name</label>
+        <div class="player-entry">
+          <div class="pdot" style="background:#4ea1ff"></div>
+          <input id="create-name" type="text" value="Player 1" placeholder="Your name">
+        </div>
+      </div>
+      <button id="create-room-btn">Create Room</button>
+
+      <div class="or-divider">or join an existing room</div>
+
+      <div class="field">
+        <label>Join as</label>
+        <div class="player-entry">
+          <div class="pdot" style="background:#2ecc71"></div>
+          <input id="join-name" type="text" placeholder="Your name">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Room Code</label>
+        <div class="player-entry">
+          <div class="pdot" style="background:#f1c40f"></div>
+          <input id="join-room-code" type="text" placeholder="ABCDE" maxlength="5">
+        </div>
+      </div>
+      <button class="ghost-btn" id="join-room-btn">Join Room</button>
+
+      <div class="small-note">Create a room, share the code, and let each player join from their own browser. The host starts the match once everyone is in the lobby.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ LOBBY ════════════════════════════════════ -->
+<div id="screen-lobby" class="screen">
+  <div class="lobby-card">
+    <div class="setup-label">Room Lobby</div>
+    <div class="lobby-head">
+      <div>
+        <div class="setup-heading">Room <span id="lobby-room-code">ABCDE</span></div>
+        <div class="setup-sub" id="lobby-status">Waiting for players to join…</div>
+      </div>
+      <button class="ghost-btn" id="copy-room-btn">Copy Invite</button>
+    </div>
+
+    <div class="field">
+      <label>Invite Link</label>
+      <div class="invite-box" id="invite-link"></div>
+    </div>
+
+    <div class="field">
+      <label>Players</label>
+      <div class="lobby-player-list" id="lobby-player-list"></div>
+    </div>
+
+    <div class="field">
+      <label>Rounds</label>
+      <div class="rounds" id="lobby-round-options">
+        <button class="round-option active" data-rounds="5">5</button>
+        <button class="round-option" data-rounds="8">8</button>
+        <button class="round-option" data-rounds="10">10</button>
+        <button class="round-option" data-rounds="15">15</button>
+      </div>
+      <div class="small-note" id="lobby-round-note">Only the host can start the match and choose the round count.</div>
+    </div>
+
+    <div class="lobby-actions">
+      <button class="primary-btn" id="lobby-start-btn">Start Match</button>
+      <button class="ghost-btn" id="leave-room-btn">Leave Room</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ GAME ═════════════════════════════════════ -->
+<div id="screen-game" class="screen">
+  <div class="map-side">
+    <div id="game-map"></div>
+    <div class="map-pill pill-top-left">
+      <div class="pill-label">Time left</div>
+      <div class="timer-value" id="timer-value">30s</div>
+    </div>
+    <div class="map-pill pill-top-right">
+      <div class="pill-label">Round</div>
+      <div style="font-weight:800;font-size:18px;" id="round-counter">1 / 5</div>
+    </div>
+    <div class="map-pill pill-bottom-left">
+      <div id="map-hint" style="font-size:13px;color:rgba(255,255,255,.72);max-width:240px;line-height:1.4;">Click the map to place your guess.</div>
+    </div>
+    <div id="peek-overlay">👁 <span id="peek-count">3</span>s</div>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sb-top">
+      <div class="round-lbl" id="round-lbl">Round 1 of 5</div>
+      <div class="mode-chip" id="mode-chip">🚩 Flag</div>
+      <div class="turn-row">
+        <div class="mini-dot" id="current-player-dot" style="background:#e74c3c"></div>
+        <span id="current-player-label">Player 1's turn</span>
+        <span id="streak-fire">🔥</span>
+      </div>
+      <div class="turn-sub" id="turn-sub">Only this player should look at the screen right now.</div>
+    </div>
+
+    <div class="clue-box">
+      <div class="clue-label" id="clue-label">Which country does this clue belong to?</div>
+      <div id="clue-body"></div>
+      <div id="detective-controls">
+        <div id="detective-meta"></div>
+        <button class="ghost-btn" id="detective-hint-btn" type="button">Reveal next clue</button>
+      </div>
+    </div>
+
+    <div class="scores-box">
+      <div class="scores-title">Scores (hidden until reveal)</div>
+      <div id="scores-list"></div>
+    </div>
+
+    <div class="controls-box">
+      <div class="scores-title">Your Jokers — once per game each</div>
+      <div class="joker-row">
+        <button class="joker-btn joker-double" id="joker-double-btn" disabled>
+          ×2 Double Points<span class="joker-tag">Doubles this round's score</span>
+        </button>
+        <button class="joker-btn joker-peek" id="joker-peek-btn" disabled>
+          👁 Peek (3s)<span class="joker-tag">Shows the target area</span>
+        </button>
+      </div>
+      <button class="primary-btn" id="confirm-btn" disabled>Click the map first</button>
+      <div class="ctrl-note" id="ctrl-note">Results appear only after everybody has guessed.</div>
+    </div>
+  </aside>
+</div>
+
+<!-- ═══════════════════════════ RESULTS ══════════════════════════════════ -->
+<div id="screen-results" class="screen">
+  <div class="results-map-wrap">
+    <div id="results-map"></div>
+    <div class="reveal-top">
+      <div class="reveal-answer-pill" id="reveal-answer">📍 Answer</div>
+      <div class="reveal-step" id="reveal-step">Revealing…</div>
+    </div>
+  </div>
+  <div class="results-panel">
+    <div class="results-head">
+      <div>
+        <h2 id="results-title">Round Results</h2>
+        <div class="rnd-badge" id="results-rnd">Round 1 of 5</div>
+      </div>
+      <button class="primary-btn" id="next-round-btn" disabled>Next Round</button>
+    </div>
+    <div class="result-cards" id="result-cards"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ FINAL ════════════════════════════════════ -->
+<div id="screen-final" class="screen">
+  <div class="final-card">
+    <h2 id="final-title">Game Over</h2>
+    <p id="final-sub">Final standings</p>
+    <div class="podium" id="podium"></div>
+    <div class="final-list" id="final-list"></div>
+    <div class="final-actions">
+      <button class="ghost-btn" id="back-start-btn">Back to Start</button>
+      <button class="primary-btn" id="play-again-btn">Play Again</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ OVERLAYS ═════════════════════════════════ -->
+
+<!-- Category picker -->
+<div id="cat-overlay">
+  <div class="cat-card">
+    <div class="cat-top">
+      <div class="cat-dot" id="cat-dot"></div>
+      <h3 id="cat-title">Choose a category</h3>
+    </div>
+    <p id="cat-sub">Pick the clue type for this round.</p>
+    <div class="cat-grid" id="cat-grid"></div>
+  </div>
+</div>
+
+<!-- Pass device -->
+<div id="pass-overlay">
+  <div class="pass-card">
+    <div class="pass-dot" id="pass-dot"></div>
+    <h3 id="pass-title">Pass to Player 2</h3>
+    <p id="pass-sub">Hand the device so the next player can guess privately.</p>
+    <button class="primary-btn" id="pass-ready-btn">Ready — I'm looking now</button>
+  </div>
+</div>
+
+<!-- Perfect guess -->
+<div id="perfect-overlay">
+  <div class="perfect-banner">
+    <h2>🎯 PERFECT GUESS!</h2>
+    <p id="perfect-name"></p>
+  </div>
+</div>
+
+<!-- Streak banner -->
+<div id="streak-banner">🔥 <span id="streak-name"></span> is on a streak! +500 bonus!</div>
+
+<!-- Confetti -->
+<div id="confetti-wrap"></div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
