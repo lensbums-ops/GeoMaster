@@ -98,14 +98,11 @@ def create_game_state(players: list[str], rounds: int) -> dict[str, Any]:
         "rounds": rounds,
         "current_round": 0,
         "current_player_index": 0,
-        "current_turn_position": 0,
         "phase": "setup",
         "question": None,
         "round_guesses": [],
-        "round_turn_order": [],
         "streak_event": None,
         "perfect_event": None,
-        # Shuffled index pools — pop from front each round, no repeats
         "country_pool": country_pool,
         "city_pool": city_pool,
         "detective_pool": detective_pool,
@@ -150,7 +147,6 @@ def build_question(mode: str, state: dict[str, Any]) -> dict[str, Any]:
 
 
 def _fresh_detective_progress() -> dict[str, int]:
-    """Return the default detective clue state for a new player's turn."""
     return {
         "revealed_clues": 1,
         "score_multiplier": DETECTIVE_MULTIPLIERS[1],
@@ -166,31 +162,20 @@ def get_category_picker_index(state: dict[str, Any]) -> int | None:
     return (current_round - 1) % len(players)
 
 
-def _build_round_turn_order(state: dict[str, Any]) -> list[int]:
-    """Rotate the guess order so a different player starts each round."""
-    player_count = len(state.get("players", []))
-    if player_count == 0:
-        return []
-
-    start_index = get_category_picker_index(state) or 0
-    return list(range(start_index, player_count)) + list(range(0, start_index))
-
-
 # ─── Round management ─────────────────────────────────────────────────────────
 def start_round(state: dict[str, Any], chosen_mode: str) -> dict[str, Any]:
-    """Begin a round with the given mode (chosen by a player)."""
-    round_turn_order = _build_round_turn_order(state)
-    state["round_turn_order"] = round_turn_order
-    state["current_turn_position"] = 0
-    state["current_player_index"] = round_turn_order[0] if round_turn_order else 0
+    """Begin a round — all players guess simultaneously."""
     state["question"] = build_question(chosen_mode, state)
     state["round_guesses"] = []
     state["streak_event"] = None
     state["perfect_event"] = None
     state["phase"] = "guessing"
-    state["detective_progress"] = (
-        _fresh_detective_progress() if chosen_mode == "detective_city" else None
-    )
+    if chosen_mode == "detective_city":
+        state["detective_progress"] = {
+            i: _fresh_detective_progress() for i in range(len(state["players"]))
+        }
+    else:
+        state["detective_progress"] = None
     return state
 
 
@@ -208,13 +193,11 @@ def begin_next_round(state: dict[str, Any]) -> dict[str, Any]:
     state["streak_event"] = None
     state["perfect_event"] = None
     state["detective_progress"] = None
-    state["round_turn_order"] = []
-    state["current_turn_position"] = 0
     return state
 
 
-def reveal_detective_hint(state: dict[str, Any]) -> dict[str, Any]:
-    """Reveal one more detective clue for the current player."""
+def reveal_detective_hint(state: dict[str, Any], player_index: int) -> dict[str, Any]:
+    """Reveal one more detective clue for the given player."""
     if state["phase"] != "guessing":
         return state
 
@@ -222,11 +205,13 @@ def reveal_detective_hint(state: dict[str, Any]) -> dict[str, Any]:
     if question.get("mode") != "detective_city":
         return state
 
-    progress = state.get("detective_progress") or _fresh_detective_progress()
+    progress_map = state.get("detective_progress") or {}
+    progress = progress_map.get(player_index) or _fresh_detective_progress()
     revealed = min(DETECTIVE_MAX_CLUES, progress["revealed_clues"] + 1)
     progress["revealed_clues"] = revealed
     progress["score_multiplier"] = DETECTIVE_MULTIPLIERS[revealed]
-    state["detective_progress"] = progress
+    progress_map[player_index] = progress
+    state["detective_progress"] = progress_map
     return state
 
 
@@ -270,20 +255,24 @@ def use_joker_peek(state: dict[str, Any]) -> dict[str, Any]:
 # ─── Guess evaluation ─────────────────────────────────────────────────────────
 def evaluate_guess(
     state: dict[str, Any],
+    player_index: int,
     lat: float | None,
     lng: float | None,
     timed_out: bool = False,
 ) -> dict[str, Any]:
     """Evaluate a player's guess and append it to round_guesses."""
-    player_index = state["current_player_index"]
     player = state["players"][player_index]
     question = state["question"]
+
+    progress_map = state.get("detective_progress") or {}
+    detective_progress = (
+        progress_map.get(player_index) if isinstance(progress_map, dict) else progress_map
+    ) or _fresh_detective_progress()
 
     # ── Timeout / no guess ──────────────────────────────────────────────────
     if timed_out or lat is None or lng is None:
         ocean = random.choice(OCEAN_POINTS)
         score = -TIMEOUT_PENALTY_PTS
-        detective_progress = state.get("detective_progress") or _fresh_detective_progress()
 
         guess = {
             "player_index": player_index,
@@ -318,7 +307,6 @@ def evaluate_guess(
         )
 
         base_score = 5_000 if inside else score_from_distance(dist_km)
-        detective_progress = state.get("detective_progress") or _fresh_detective_progress()
         detective_multiplier = (
             detective_progress["score_multiplier"]
             if question["mode"] == "detective_city"
@@ -392,29 +380,16 @@ def _update_streak(
 
 # ─── Turn / phase transitions ─────────────────────────────────────────────────
 def next_player_or_reveal(state: dict[str, Any]) -> dict[str, Any]:
-    """Advance to next player, or to results phase if all have guessed."""
-    state["current_turn_position"] = state.get("current_turn_position", 0) + 1
-    round_turn_order = state.get("round_turn_order") or list(range(len(state["players"])))
+    """Move to results once every player has submitted a guess."""
+    if len(state["round_guesses"]) < len(state["players"]):
+        return state  # still waiting for others
 
-    # Edge case: more players remaining
-    if state["current_turn_position"] < len(round_turn_order):
-        state["current_player_index"] = round_turn_order[state["current_turn_position"]]
-        state["phase"] = "guessing"
-        state["detective_progress"] = (
-            _fresh_detective_progress()
-            if state.get("question", {}).get("mode") == "detective_city"
-            else None
-        )
-        return state
-
-    # All players done — apply scores and switch to results
+    # All guesses in — apply scores
     for guess in state["round_guesses"]:
         p = state["players"][guess["player_index"]]
-        # Edge case: total_score cannot go below 0
         p["total_score"] = max(0, p.get("total_score", 0) + guess["round_score"])
         guess["total_after_round"] = p["total_score"]
 
-    # Find round winner (smallest distance among non-timeout guesses)
     valid = [g for g in state["round_guesses"] if not g["timed_out"]]
     if valid:
         winner = min(valid, key=lambda g: g["distance_km"])
@@ -468,12 +443,18 @@ def _public_question(
     }
 
 
-def get_public_state(state: dict[str, Any]) -> dict[str, Any]:
+def get_public_state(state: dict[str, Any], viewer_index: int | None = None) -> dict[str, Any]:
     """Return a copy of state safe to expose to the browser.
 
     During guessing phase, hide other players' guess locations and scores.
     """
     public = deepcopy(state)
+
+    # detective_progress is now a dict[player_index → progress] — expose only the viewer's own
+    if isinstance(public.get("detective_progress"), dict):
+        public["detective_progress"] = (
+            public["detective_progress"].get(viewer_index) if viewer_index is not None else None
+        )
 
     if public.get("question"):
         if public["phase"] == "guessing":

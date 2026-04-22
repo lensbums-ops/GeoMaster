@@ -158,7 +158,7 @@ function onMapClick(e) {
   pendingGuess = { lat, lng };
   if (guessMarker) gameMap.removeLayer(guessMarker);
 
-  const p = currentState.players[currentState.current_player_index];
+  const p = currentState.players[currentState.viewer_index] ?? currentState.players[0];
   guessMarker = L.marker([lat, lng], {
     icon: L.divIcon({
       className: '',
@@ -353,9 +353,7 @@ function renderScores(state) {
     if (state.phase === 'category_pick') {
       tag = i === state.current_picker_index ? 'Picker' : 'Ready';
     } else if (state.phase === 'guessing') {
-      tag = guessedPlayers.has(i) ? 'Locked'
-        : i === state.current_player_index ? 'Current'
-        : 'Waiting';
+      tag = guessedPlayers.has(i) ? '✓ Locked in' : 'Guessing…';
     } else if (state.phase === 'results' || state.phase === 'finished') {
       tag = 'Done';
     }
@@ -380,7 +378,7 @@ function renderJokers(state) {
     return;
   }
 
-  const p = state.players[state.current_player_index];
+  const p = state.players[state.viewer_index];
   const canUse = state.can_guess;
   const doubleActive = Boolean(p.joker_double_active);
 
@@ -414,29 +412,31 @@ function renderGameChrome(state) {
   document.getElementById('round-counter').textContent = `${state.current_round} / ${state.rounds}`;
   document.getElementById('mode-chip').textContent = modeLabels[state.question?.mode] || 'Waiting';
 
-  const current = state.players[state.current_player_index] || state.players[state.current_picker_index];
-  const activePlayer = state.phase === 'category_pick'
-    ? state.players[state.current_picker_index]
-    : state.players[state.current_player_index];
-
-  if (activePlayer) {
-    document.getElementById('current-player-dot').style.background = activePlayer.color;
-    document.getElementById('current-player-label').textContent =
-      state.phase === 'category_pick'
-        ? `${activePlayer.name} chooses the mode`
-        : `${activePlayer.name}'s turn`;
-    document.getElementById('streak-fire').style.display = activePlayer.streak >= 3 ? 'inline' : 'none';
-  }
-
   if (state.phase === 'category_pick') {
+    const picker = state.players[state.current_picker_index];
+    document.getElementById('current-player-dot').style.background = picker.color;
+    document.getElementById('current-player-label').textContent = `${picker.name} chooses the mode`;
+    document.getElementById('streak-fire').style.display = picker.streak >= 3 ? 'inline' : 'none';
     document.getElementById('turn-sub').textContent = state.can_choose_category
       ? 'You are the round picker — choose the next clue type.'
-      : `Waiting for ${state.players[state.current_picker_index].name} to choose the category.`;
+      : `Waiting for ${picker.name} to choose the category.`;
   } else if (state.phase === 'guessing') {
+    const viewer = state.players[state.viewer_index];
+    const submitted = (state.round_guesses || []).length;
+    const total = state.players.length;
+    document.getElementById('current-player-dot').style.background = viewer?.color || '#aaa';
+    document.getElementById('current-player-label').textContent = state.can_guess
+      ? 'Your turn — guess now!'
+      : 'Your guess is locked in!';
+    document.getElementById('streak-fire').style.display = (viewer?.streak >= 3) ? 'inline' : 'none';
     document.getElementById('turn-sub').textContent = state.can_guess
-      ? 'It is your turn — place your guess before time runs out.'
-      : `Waiting for ${state.players[state.current_player_index].name} to guess from their device.`;
+      ? 'Place your marker and confirm before time runs out.'
+      : `${submitted} of ${total} guesses submitted — waiting for others…`;
   } else {
+    const viewer = state.players[state.viewer_index];
+    document.getElementById('current-player-dot').style.background = viewer?.color || '#aaa';
+    document.getElementById('current-player-label').textContent = viewer?.name || '';
+    document.getElementById('streak-fire').style.display = 'none';
     document.getElementById('turn-sub').textContent = `Room ${state.room_code} · online multiplayer`;
   }
 
@@ -468,9 +468,9 @@ function setGuessControlsForState(state) {
       : 'Results appear only after everybody has guessed.';
   } else {
     confirmBtn.disabled = true;
-    confirmBtn.textContent = 'Waiting for your turn';
-    document.getElementById('map-hint').textContent = `${state.players[state.current_player_index].name} is currently guessing on their own device.`;
-    document.getElementById('ctrl-note').textContent = 'You can follow the shared round live while the current player submits their guess.';
+    confirmBtn.textContent = 'Guess submitted ✓';
+    document.getElementById('map-hint').textContent = 'Your guess is locked in — waiting for others.';
+    document.getElementById('ctrl-note').textContent = 'All players guess simultaneously. Results appear once everyone has submitted.';
   }
 }
 
@@ -523,6 +523,7 @@ function processState(state) {
 
   const previousVersion = currentState?.version;
   const previousPhase = currentState?.phase;
+  const previousCanGuess = currentState?.can_guess;
   const versionChanged = previousVersion !== state.version;
   const phaseChanged = previousPhase !== state.phase;
 
@@ -567,11 +568,12 @@ function processState(state) {
     showScreen('screen-game');
     invalidateMapsSoon();
 
-    if (phaseChanged || (versionChanged && !state.can_guess)) {
+    // Clear marker when phase changes or when THIS player just submitted (can_guess flipped to false)
+    if (phaseChanged || (previousCanGuess && !state.can_guess)) {
       clearGuessMarker();
     }
 
-    if (peekLayer && gameMap && !state.can_guess) {
+    if (peekLayer && gameMap && previousCanGuess && !state.can_guess) {
       gameMap.removeLayer(peekLayer);
       peekLayer = null;
       document.getElementById('peek-overlay').style.display = 'none';

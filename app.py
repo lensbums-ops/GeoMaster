@@ -103,25 +103,26 @@ def _clear_transient_events(state: dict[str, Any]) -> None:
 
 def _sync_room_timeouts(room: dict[str, Any]) -> None:
     state = room.get("game")
-    if not state:
+    if not state or state.get("phase") != "guessing":
         return
 
-    changed = False
-    while state.get("phase") == "guessing":
-        deadline = state.get("turn_ends_at_ms")
-        if deadline is None or _now_ms() < deadline:
-            break
+    deadline = state.get("turn_ends_at_ms")
+    if deadline is None or _now_ms() < deadline:
+        return
 
-        _clear_transient_events(state)
-        state = evaluate_guess(state, lat=None, lng=None, timed_out=True)
-        state = next_player_or_reveal(state)
-        _set_turn_deadline(state, reset=True)
-        changed = True
+    guessed = {g["player_index"] for g in state.get("round_guesses", [])}
+    unguessed = [i for i in range(len(state["players"])) if i not in guessed]
+    if not unguessed:
+        return
 
-    if changed:
-        _touch_game_state(state)
-        room["game"] = state
-        _touch_room(room)
+    _clear_transient_events(state)
+    for pi in unguessed:
+        state = evaluate_guess(state, player_index=pi, lat=None, lng=None, timed_out=True)
+
+    state = next_player_or_reveal(state)
+    _touch_game_state(state)
+    room["game"] = state
+    _touch_room(room)
 
 
 def _remove_player_from_room(room: dict[str, Any], player_id: str) -> None:
@@ -177,7 +178,8 @@ def _game_payload(room: dict[str, Any]) -> dict[str, Any] | None:
     player_id = _ensure_player_id()
     viewer_index = _find_player_index(room, player_id)
     picker_index = get_category_picker_index(state)
-    public = get_public_state(state)
+    guessed_indices = {g["player_index"] for g in state.get("round_guesses", [])}
+    public = get_public_state(state, viewer_index=viewer_index)
     public.update(
         {
             "room_code": room["code"],
@@ -185,7 +187,7 @@ def _game_payload(room: dict[str, Any]) -> dict[str, Any] | None:
             "viewer_name": room["players"][viewer_index]["name"] if viewer_index is not None else None,
             "is_host": player_id == room["host_id"],
             "can_choose_category": state["phase"] == "category_pick" and viewer_index == picker_index,
-            "can_guess": state["phase"] == "guessing" and viewer_index == state["current_player_index"],
+            "can_guess": state["phase"] == "guessing" and viewer_index is not None and viewer_index not in guessed_indices,
             "can_advance_round": state["phase"] == "results" and player_id == room["host_id"],
             "current_picker_index": picker_index,
             "turn_seconds": ROUND_TIME_SECONDS,
@@ -420,8 +422,11 @@ def submit_guess():
 
     player_id = _ensure_player_id()
     viewer_index = _find_player_index(room, player_id)
-    if viewer_index != state["current_player_index"]:
-        return _err("It is not your turn", 403)
+    if viewer_index is None:
+        return _err("You are not in this room", 403)
+    guessed = {g["player_index"] for g in state.get("round_guesses", [])}
+    if viewer_index in guessed:
+        return _err("You have already guessed this round", 403)
 
     payload = request.get_json(force=True)
     try:
@@ -434,9 +439,9 @@ def submit_guess():
         return _err("Coordinates out of valid range")
 
     _clear_transient_events(state)
-    state = evaluate_guess(state, lat=lat, lng=lng)
+    state = evaluate_guess(state, player_index=viewer_index, lat=lat, lng=lng)
     state = next_player_or_reveal(state)
-    _set_turn_deadline(state, reset=True)
+    _set_turn_deadline(state, reset=False)
     _touch_game_state(state)
     room["game"] = state
     _touch_room(room)
@@ -455,13 +460,16 @@ def submit_timeout():
 
     player_id = _ensure_player_id()
     viewer_index = _find_player_index(room, player_id)
-    if viewer_index != state["current_player_index"]:
-        return _err("It is not your turn", 403)
+    if viewer_index is None:
+        return _err("You are not in this room", 403)
+    guessed = {g["player_index"] for g in state.get("round_guesses", [])}
+    if viewer_index in guessed:
+        return _err("You have already guessed this round", 403)
 
     _clear_transient_events(state)
-    state = evaluate_guess(state, lat=None, lng=None, timed_out=True)
+    state = evaluate_guess(state, player_index=viewer_index, lat=None, lng=None, timed_out=True)
     state = next_player_or_reveal(state)
-    _set_turn_deadline(state, reset=True)
+    _set_turn_deadline(state, reset=False)
     _touch_game_state(state)
     room["game"] = state
     _touch_room(room)
@@ -480,19 +488,23 @@ def reveal_hint():
 
     player_id = _ensure_player_id()
     viewer_index = _find_player_index(room, player_id)
-    if viewer_index != state["current_player_index"]:
-        return _err("It is not your turn", 403)
+    if viewer_index is None:
+        return _err("You are not in this room", 403)
+    guessed = {g["player_index"] for g in state.get("round_guesses", [])}
+    if viewer_index in guessed:
+        return _err("You have already guessed this round", 403)
 
     question = state.get("question") or {}
     if question.get("mode") != "detective_city":
         return _err("Detective hints are only available in Detective City mode")
 
-    progress = state.get("detective_progress") or {}
+    progress_map = state.get("detective_progress") or {}
+    progress = progress_map.get(viewer_index) or {}
     if progress.get("revealed_clues", 1) >= 3:
         return _err("All detective clues are already revealed")
 
     _clear_transient_events(state)
-    state = reveal_detective_hint(state)
+    state = reveal_detective_hint(state, player_index=viewer_index)
     _touch_game_state(state)
     room["game"] = state
     _touch_room(room)
@@ -535,10 +547,13 @@ def activate_double():
 
     player_id = _ensure_player_id()
     viewer_index = _find_player_index(room, player_id)
-    if viewer_index != state["current_player_index"]:
-        return _err("It is not your turn", 403)
+    if viewer_index is None:
+        return _err("You are not in this room", 403)
+    guessed = {g["player_index"] for g in state.get("round_guesses", [])}
+    if viewer_index in guessed:
+        return _err("You have already guessed this round", 403)
 
-    player = state["players"][state["current_player_index"]]
+    player = state["players"][viewer_index]
     if not player.get("joker_double", False):
         return _err("Double joker already used")
 
@@ -562,10 +577,13 @@ def activate_peek():
 
     player_id = _ensure_player_id()
     viewer_index = _find_player_index(room, player_id)
-    if viewer_index != state["current_player_index"]:
-        return _err("It is not your turn", 403)
+    if viewer_index is None:
+        return _err("You are not in this room", 403)
+    guessed = {g["player_index"] for g in state.get("round_guesses", [])}
+    if viewer_index in guessed:
+        return _err("You have already guessed this round", 403)
 
-    player = state["players"][state["current_player_index"]]
+    player = state["players"][viewer_index]
     if not player.get("joker_peek", False):
         return _err("Peek joker already used")
 
