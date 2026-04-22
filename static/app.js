@@ -128,6 +128,23 @@ function initResultsMap() {
   }).addTo(resultsMap);
 }
 
+function invalidateMapsSoon() {
+  requestAnimationFrame(() => {
+    if (gameMap && document.getElementById('screen-game').classList.contains('active')) {
+      gameMap.invalidateSize();
+      setTimeout(() => {
+        if (gameMap) gameMap.invalidateSize();
+      }, 120);
+    }
+    if (resultsMap && document.getElementById('screen-results').classList.contains('active')) {
+      resultsMap.invalidateSize();
+      setTimeout(() => {
+        if (resultsMap) resultsMap.invalidateSize();
+      }, 120);
+    }
+  });
+}
+
 function onMapClick(e) {
   if (!currentState || currentState.phase !== 'guessing' || !currentState.can_guess) return;
 
@@ -538,7 +555,7 @@ function processState(state) {
     document.getElementById('peek-overlay').style.display = 'none';
     showCategoryPicker(state);
     setGuessControlsForState(state);
-    if (gameMap) gameMap.invalidateSize();
+    invalidateMapsSoon();
     activeResultsKey = null;
     activeFinalKey = null;
     return;
@@ -548,7 +565,7 @@ function processState(state) {
 
   if (state.phase === 'guessing') {
     showScreen('screen-game');
-    if (gameMap) gameMap.invalidateSize();
+    invalidateMapsSoon();
 
     if (phaseChanged || (versionChanged && !state.can_guess)) {
       clearGuessMarker();
@@ -595,6 +612,7 @@ async function showResultsScreen(state) {
   showScreen('screen-results');
   initResultsMap();
   clearRevealLayers();
+  invalidateMapsSoon();
 
   const q = state.question;
   document.getElementById('reveal-answer').textContent = `📍 ${q.answer_name}`;
@@ -1042,3 +1060,4 @@ window.addEventListener('load', async () => {
   prefillRoomCodeFromQuery();
   await refreshFromServer();
 });
+window.addEventListener('resize', invalidateMapsSoon);

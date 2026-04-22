@@ -291,9 +291,9 @@ button { border: none; cursor: pointer; transition: .15s ease; }
 }
 
 /* ══ GAME SCREEN ════════════════════════════════════════════════════════════ */
-#screen-game { min-height: 100vh; flex-direction: row; }
-.map-side { flex: 1; position: relative; min-height: 100vh; }
-#game-map { width: 100%; height: 100%; }
+#screen-game { min-height: 100vh; height: 100vh; flex-direction: row; }
+.map-side { flex: 1 1 auto; position: relative; min-height: 100vh; height: 100vh; }
+#game-map { width: 100%; height: 100%; min-height: 100%; }
 
 .map-pill {
   position: absolute; z-index: 1000;
@@ -592,7 +592,7 @@ button { border: none; cursor: pointer; transition: .15s ease; }
   .lobby-actions { flex-direction: column; }
   .lobby-actions .primary-btn,
   .lobby-actions .ghost-btn { width: 100%; }
-  #screen-game { flex-direction: column; }
+  #screen-game { flex-direction: column; height: auto; }
   .sidebar { width: 100%; min-height: auto; border-left: none; border-top: 1px solid rgba(255,255,255,.08); }
-  .map-side { min-height: 52vh; }
+  .map-side { min-height: 52vh; height: 52vh; flex: 0 0 52vh; }
 }
