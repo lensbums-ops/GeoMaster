@@ -35,18 +35,39 @@ geomaster/
 - Draws markers, lines and animations
 - Shows overlays (pass device, category picker, confetti)
 
-## Setup
+## Local Setup
 
 ```bash
 # 1. Install dependencies
 pip install -r requirements.txt
 
 # 2. Run the server
-python app.py
+python3 app.py
 
 # 3. Open in browser
 http://127.0.0.1:5000
 ```
+
+## Deploy To Render
+
+1. Push the project to GitHub.
+2. Create a new Render Web Service from the repo.
+3. Use these settings:
+
+```txt
+Build Command: pip install -r requirements.txt
+Start Command: gunicorn app:app
+```
+
+4. Add an environment variable:
+
+```txt
+SECRET_KEY=choose-a-long-random-secret
+```
+
+5. Deploy and open the generated `onrender.com` URL.
+
+Note: the current multiplayer rooms are stored in server memory, so they reset if the service restarts or redeploys.
 
 ## API endpoints
 
