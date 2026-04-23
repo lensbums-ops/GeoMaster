@@ -39,7 +39,7 @@
         <div class="rules-title">How to play</div>
         <div class="rule-row">
           <span class="rule-icon">🗺️</span>
-          <span>Each round one player picks a clue type. Everyone guesses privately — click the correct country or city on the map.</span>
+          <span>Each round one player picks a clue type. Everyone guesses simultaneously by clicking the correct country or city on the map.</span>
         </div>
         <div class="rule-row">
           <span class="rule-icon">📍</span>
@@ -47,7 +47,7 @@
         </div>
         <div class="rule-row">
           <span class="rule-icon">⏱️</span>
-          <span>You have <strong>30 seconds</strong> per turn. Miss the timer and a phantom marker drops somewhere in the ocean — plus a 500 pt penalty.</span>
+          <span>You have <strong>30 seconds</strong> per round. Miss the timer and a phantom marker drops somewhere in the ocean, plus a 500 pt penalty.</span>
         </div>
         <div class="rule-row">
           <span class="rule-icon">🔥</span>
@@ -55,49 +55,51 @@
         </div>
         <div class="rule-row">
           <span class="rule-icon">🃏</span>
-          <span><strong>Jokers:</strong> each player has two — <em>Double Points</em> (×2 your score) and <em>Peek</em> (see the target for 3 seconds). Use them wisely, once per game each.</span>
+          <span><strong>Jokers:</strong> each player has two: <em>Double Points</em> (×2 your score) and <em>Peek</em> (see the target for 3 seconds). Use them wisely, once per game each.</span>
         </div>
         <div class="rule-row">
           <span class="rule-icon">🏆</span>
-          <span>After all rounds the player with the most points wins. Scores are hidden until the reveal — no peeking!</span>
+          <span>After all rounds the player with the most points wins. Scores are hidden until the reveal.</span>
         </div>
       </div>
     </div>
 
     <div class="start-right">
       <div class="setup-label">Online Multiplayer</div>
-      <div class="setup-heading">Create or join a room</div>
-      <div class="setup-sub">One browser per player · Python backend · room code based</div>
+      <div class="setup-heading" id="setup-heading">Create or join a room</div>
 
-      <div class="field">
-        <label>Your Name</label>
-        <div class="player-entry">
-          <div class="pdot" style="background:#4ea1ff"></div>
-          <input id="create-name" type="text" value="Player 1" placeholder="Your name">
+      <div id="create-section">
+        <div class="field">
+          <label>Your Name</label>
+          <div class="player-entry">
+            <div class="pdot" style="background:#4ea1ff"></div>
+            <input id="create-name" type="text" value="Player 1" placeholder="Your name">
+          </div>
         </div>
-      </div>
-      <button id="create-room-btn">Create Room</button>
-
-      <div class="or-divider">or join an existing room</div>
-
-      <div class="field">
-        <label>Join as</label>
-        <div class="player-entry">
-          <div class="pdot" style="background:#2ecc71"></div>
-          <input id="join-name" type="text" placeholder="Your name">
-        </div>
+        <button id="create-room-btn">Create Room</button>
+        <div class="or-divider" id="or-divider">or join an existing room</div>
       </div>
 
-      <div class="field">
-        <label>Room Code</label>
-        <div class="player-entry">
-          <div class="pdot" style="background:#f1c40f"></div>
-          <input id="join-room-code" type="text" placeholder="ABCDE" maxlength="5">
+      <div id="join-section">
+        <div class="field">
+          <label>Join as</label>
+          <div class="player-entry">
+            <div class="pdot" style="background:#2ecc71"></div>
+            <input id="join-name" type="text" placeholder="Your name">
+          </div>
         </div>
-      </div>
-      <button class="ghost-btn" id="join-room-btn">Join Room</button>
 
-      <div class="small-note">Create a room, share the code, and let each player join from their own browser. The host starts the match once everyone is in the lobby.</div>
+        <div class="field">
+          <label>Room Code</label>
+          <div class="player-entry">
+            <div class="pdot" style="background:#f1c40f"></div>
+            <input id="join-room-code" type="text" placeholder="ABCDE" maxlength="5">
+          </div>
+        </div>
+        <button class="ghost-btn" id="join-room-btn">Join Room</button>
+      </div>
+
+      <div class="small-note" id="start-note">Create a room, share the code, and let each player join from their own browser. The host starts the match once everyone is in the lobby.</div>
     </div>
   </div>
 </div>

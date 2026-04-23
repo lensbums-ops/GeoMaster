@@ -1019,7 +1019,21 @@ function getSelectedLobbyRounds() {
 function prefillRoomCodeFromQuery() {
   const params = new URLSearchParams(window.location.search);
   const room = params.get('room');
-  if (room) document.getElementById('join-room-code').value = room.toUpperCase();
+  if (!room) return;
+
+  document.getElementById('join-room-code').value = room.toUpperCase();
+
+  // Invite mode: hide create section, highlight join section
+  document.getElementById('create-section').style.display = 'none';
+  document.getElementById('setup-heading').textContent = 'You were invited to a room';
+  document.getElementById('start-note').textContent = 'Enter your name and join the room. The host will start the match once everyone is in.';
+
+  const joinSection = document.getElementById('join-section');
+  joinSection.style.cssText = 'background:rgba(78,161,255,0.08);border:1px solid rgba(78,161,255,0.25);border-radius:16px;padding:16px;';
+
+  const joinBtn = document.getElementById('join-room-btn');
+  joinBtn.className = 'primary-btn';
+  joinBtn.style.width = '100%';
 }
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
