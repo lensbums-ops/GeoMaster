@@ -270,15 +270,13 @@ def reveal_detective_hint(state: dict[str, Any], player_index: int) -> dict[str,
 
 
 # ─── Jokers ───────────────────────────────────────────────────────────────────
-def use_joker_double(state: dict[str, Any]) -> dict[str, Any]:
-    """Activate the ×2 joker for the current player."""
-    p = state["players"][state["current_player_index"]]
+def use_joker_double(state: dict[str, Any], player_index: int | None = None) -> dict[str, Any]:
+    """Activate the ×2 joker for the given player."""
+    idx = player_index if player_index is not None else state["current_player_index"]
+    p = state["players"][idx]
 
-    # Edge case: joker already used
     if not p["joker_double"]:
-        return state  # silently ignore
-
-    # Edge case: wrong phase
+        return state
     if state["phase"] != "guessing":
         return state
 
@@ -287,18 +285,13 @@ def use_joker_double(state: dict[str, Any]) -> dict[str, Any]:
     return state
 
 
-def use_joker_peek(state: dict[str, Any]) -> dict[str, Any]:
-    """Mark the peek joker as used for the current player.
+def use_joker_peek(state: dict[str, Any], player_index: int | None = None) -> dict[str, Any]:
+    """Mark the peek joker as used for the given player."""
+    idx = player_index if player_index is not None else state["current_player_index"]
+    p = state["players"][idx]
 
-    The actual 3-second outline display is handled by the frontend;
-    Python just records that the joker was spent.
-    """
-    p = state["players"][state["current_player_index"]]
-
-    # Edge case: joker already used
     if not p.get("joker_peek", False):
         return state
-
     if state["phase"] != "guessing":
         return state
 
@@ -439,9 +432,13 @@ def _update_streak(
 
 # ─── Turn / phase transitions ─────────────────────────────────────────────────
 def next_player_or_reveal(state: dict[str, Any]) -> dict[str, Any]:
-    """Move to results once every player has submitted a guess."""
-    if len(state["round_guesses"]) < len(state["players"]):
-        return state  # still waiting for others
+    """Move to results once every active (non-disconnected) player has guessed."""
+    active_indices = {
+        i for i, p in enumerate(state["players"]) if not p.get("disconnected")
+    }
+    guessed_indices = {g["player_index"] for g in state["round_guesses"]}
+    if not active_indices.issubset(guessed_indices):
+        return state  # still waiting for active players
 
     # All guesses in — apply scores
     for guess in state["round_guesses"]:

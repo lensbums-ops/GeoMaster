@@ -29,6 +29,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-only-change-me")
 ROOMS: dict[str, dict[str, Any]] = {}
 ROUND_TIME_SECONDS = 30
 ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+ROOM_TTL_MS = 5 * 60 * 1000  # delete rooms inactive for 5 minutes
 
 
 # ─── Time / room helpers ──────────────────────────────────────────────────────
@@ -101,17 +102,47 @@ def _clear_transient_events(state: dict[str, Any]) -> None:
     state["perfect_event"] = None
 
 
+def _cleanup_stale_rooms() -> None:
+    cutoff = _now_ms() - ROOM_TTL_MS
+    stale = [code for code, room in list(ROOMS.items()) if room.get("updated_at_ms", 0) < cutoff]
+    for code in stale:
+        ROOMS.pop(code, None)
+
+
 def _sync_room_timeouts(room: dict[str, Any]) -> None:
     state = room.get("game")
     if not state or state.get("phase") != "guessing":
         return
 
+    guessed = {g["player_index"] for g in state.get("round_guesses", [])}
+
+    # Immediately phantom any disconnected players who haven't guessed yet
+    disconnected_unguessed = [
+        i for i, p in enumerate(state["players"])
+        if p.get("disconnected") and i not in guessed
+    ]
+    if disconnected_unguessed:
+        _clear_transient_events(state)
+        for pi in disconnected_unguessed:
+            state = evaluate_guess(state, player_index=pi, lat=None, lng=None, timed_out=True)
+        state = next_player_or_reveal(state)
+        _set_turn_deadline(state, reset=False)
+        _touch_game_state(state)
+        room["game"] = state
+        _touch_room(room)
+        if state.get("phase") != "guessing":
+            return
+        guessed = {g["player_index"] for g in state.get("round_guesses", [])}
+
+    # Phantom remaining players once the timer expires
     deadline = state.get("turn_ends_at_ms")
     if deadline is None or _now_ms() < deadline:
         return
 
-    guessed = {g["player_index"] for g in state.get("round_guesses", [])}
-    unguessed = [i for i in range(len(state["players"])) if i not in guessed]
+    unguessed = [
+        i for i, p in enumerate(state["players"])
+        if i not in guessed and not p.get("disconnected")
+    ]
     if not unguessed:
         return
 
@@ -147,6 +178,7 @@ def _room_payload(room: dict[str, Any]) -> dict[str, Any]:
     viewer = room["players"][viewer_index] if viewer_index is not None else None
 
     votes = room.get("rematch_votes", [])
+    active_players = [p for p in room["players"] if not p.get("disconnected")]
     return {
         "room_code": room["code"],
         "started": room["started"],
@@ -159,12 +191,13 @@ def _room_payload(room: dict[str, Any]) -> dict[str, Any]:
             {
                 "name": player["name"],
                 "color": player["color"],
+                "disconnected": player.get("disconnected", False),
             }
             for player in room["players"]
         ],
         "version": room.get("version", 0),
         "rematch_votes": len(votes),
-        "rematch_total": len(room["players"]),
+        "rematch_total": len(active_players),
         "viewer_voted_rematch": player_id in votes,
     }
 
@@ -251,6 +284,7 @@ def bootstrap():
 
 @app.get("/api/state")
 def get_state():
+    _cleanup_stale_rooms()
     room = _get_room()
     if not room:
         return jsonify({"room": None, "game": None}), 200
@@ -342,10 +376,46 @@ def leave_room():
     if not room:
         return jsonify({"room": None, "game": None}), 200
 
-    if room["started"] and room.get("game", {}).get("phase") != "finished":
-        return _err("Leaving an active online match is not supported yet")
-
     player_id = _ensure_player_id()
+    viewer_index = _find_player_index(room, player_id)
+    state = room.get("game")
+
+    # Mid-game leave: mark disconnected and phantom if still guessing
+    if room["started"] and state and state.get("phase") not in ("finished",) and viewer_index is not None:
+        # Mark disconnected in room players list and game state
+        room["players"][viewer_index]["disconnected"] = True
+        state["players"][viewer_index]["disconnected"] = True
+
+        # Transfer host if needed
+        if room["host_id"] == player_id:
+            for p in room["players"]:
+                if p["id"] != player_id and not p.get("disconnected"):
+                    room["host_id"] = p["id"]
+                    break
+
+        # Auto-phantom if they haven't guessed yet
+        if state["phase"] == "guessing":
+            guessed = {g["player_index"] for g in state.get("round_guesses", [])}
+            if viewer_index not in guessed:
+                _clear_transient_events(state)
+                state = evaluate_guess(state, player_index=viewer_index, lat=None, lng=None, timed_out=True)
+                state = next_player_or_reveal(state)
+                _set_turn_deadline(state, reset=False)
+                _touch_game_state(state)
+                room["game"] = state
+
+        # If everyone left, delete the room
+        active = [p for p in room["players"] if not p.get("disconnected")]
+        if not active:
+            ROOMS.pop(room["code"], None)
+            _clear_room_session()
+            return jsonify({"room": None, "game": None}), 200
+
+        _touch_room(room)
+        _clear_room_session()
+        return jsonify({"room": None, "game": None}), 200
+
+    # Lobby leave (game not started or finished)
     _remove_player_from_room(room, player_id)
     _clear_room_session()
     return jsonify({"room": None, "game": None}), 200
@@ -581,8 +651,12 @@ def rematch():
         votes.append(player_id)
         _touch_room(room)
 
-    if len(votes) >= len(room["players"]):
-        for player in room["players"]:
+    active_count = len([p for p in room["players"] if not p.get("disconnected")])
+    if len(votes) >= active_count:
+        # Keep only active (non-disconnected) players for the rematch
+        room["players"] = [p for p in room["players"] if not p.get("disconnected")]
+        for i, player in enumerate(room["players"]):
+            player["color"] = PLAYER_COLORS[i]
             player["joker_double"] = True
             player["joker_peek"] = True
         room["started"] = False
@@ -617,7 +691,7 @@ def activate_double():
         return _err("Double joker already used")
 
     _clear_transient_events(state)
-    state = use_joker_double(state)
+    state = use_joker_double(state, player_index=viewer_index)
     _touch_game_state(state)
     room["game"] = state
     _touch_room(room)
@@ -648,7 +722,7 @@ def activate_peek():
 
     question = state["question"]
     _clear_transient_events(state)
-    state = use_joker_peek(state)
+    state = use_joker_peek(state, player_index=viewer_index)
     _touch_game_state(state)
     room["game"] = state
     _touch_room(room)
