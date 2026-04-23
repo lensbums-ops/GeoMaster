@@ -678,10 +678,27 @@ async function showResultsScreen(state) {
   });
 
   const bounds = [[q.answer_lat - 2, q.answer_lng - 2], [q.answer_lat + 2, q.answer_lng + 2]];
-  if (q.radius_km) {
+  const targetStyle = { color: '#f1c40f', weight: 2, fillColor: '#f1c40f', fillOpacity: 0.2 };
+
+  if (q.kind === 'country' && q.answer_iso) {
+    try {
+      const res = await fetch(`/api/border/${q.answer_iso}`);
+      if (res.ok) {
+        const geojson = await res.json();
+        const layer = L.geoJSON(geojson, { style: targetStyle }).addTo(resultsMap);
+        revealLayers.push(layer);
+        try {
+          const b = layer.getBounds();
+          bounds.push(
+            [b.getSouthWest().lat, b.getSouthWest().lng],
+            [b.getNorthEast().lat, b.getNorthEast().lng],
+          );
+        } catch (_) {}
+      }
+    } catch (_) {}
+  } else if (q.radius_km) {
     const circle = L.circle([q.answer_lat, q.answer_lng], {
-      radius: q.radius_km * 1000,
-      color: '#f1c40f', weight: 2, fillColor: '#f1c40f', fillOpacity: 0.15,
+      radius: q.radius_km * 1000, ...targetStyle,
     }).addTo(resultsMap);
     revealLayers.push(circle);
     try {
@@ -897,10 +914,24 @@ async function activatePeek() {
   if (!target) return;
 
   if (peekLayer && gameMap) { gameMap.removeLayer(peekLayer); peekLayer = null; }
-  peekLayer = L.circle([target.lat, target.lng], {
-    radius: target.radius_km * 1000,
-    color: '#9b59b6', weight: 3, fillColor: '#9b59b6', fillOpacity: 0.22, dashArray: '6,4',
-  }).addTo(gameMap);
+
+  const peekStyle = { color: '#9b59b6', weight: 3, fillColor: '#9b59b6', fillOpacity: 0.22, dashArray: '6,4' };
+
+  if (target.kind === 'country' && target.iso) {
+    try {
+      const res = await fetch(`/api/border/${target.iso}`);
+      if (res.ok) {
+        const geojson = await res.json();
+        peekLayer = L.geoJSON(geojson, { style: peekStyle }).addTo(gameMap);
+      }
+    } catch (_) {}
+  }
+
+  if (!peekLayer) {
+    peekLayer = L.circle([target.lat, target.lng], {
+      radius: target.radius_km * 1000, ...peekStyle,
+    }).addTo(gameMap);
+  }
 
   const overlay = document.getElementById('peek-overlay');
   const count = document.getElementById('peek-count');

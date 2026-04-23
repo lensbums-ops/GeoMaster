@@ -658,8 +658,21 @@ def activate_peek():
             "lat": question["answer_lat"],
             "lng": question["answer_lng"],
             "radius_km": question["radius_km"],
+            "iso": question.get("answer_iso"),
+            "kind": question.get("kind"),
         },
     )
+
+
+# ─── Country border GeoJSON ───────────────────────────────────────────────────
+@app.get("/api/border/<iso>")
+def get_border(iso: str):
+    from game_logic import _COUNTRY_BORDERS
+    from shapely.geometry import mapping as _mapping
+    geom = _COUNTRY_BORDERS.get(iso.lower())
+    if geom is None:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(_mapping(geom))
 
 
 if __name__ == "__main__":
