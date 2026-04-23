@@ -265,11 +265,14 @@ function stopTimer(reset = true) {
   }
 }
 
+let _lastTickSecond = -1;
+
 function renderTimer() {
   const el = document.getElementById('timer-value');
   if (!timerDeadlineMs) {
     el.textContent = '—';
     el.className = 'timer-value';
+    _lastTickSecond = -1;
     return;
   }
 
@@ -277,10 +280,17 @@ function renderTimer() {
   const leftSeconds = Math.ceil(leftMs / 1000);
   el.textContent = `${leftSeconds}s`;
   el.className = leftSeconds <= 10 ? 'timer-value warn' : 'timer-value';
+
+  // Tick sound in last 5 seconds, once per second, only for active guesser
+  if (timerCanAutoTimeout && leftSeconds <= 5 && leftSeconds > 0 && leftSeconds !== _lastTickSecond) {
+    _lastTickSecond = leftSeconds;
+    Sounds.tick();
+  }
 }
 
 async function handleTimeout() {
   if (!currentState || !currentState.can_guess) return;
+  Sounds.timeout();
   const payload = await api('/api/timeout', 'POST', {}, { showErrors: false });
   if (payload) applyPayload(payload);
 }
@@ -723,6 +733,7 @@ async function showResultsScreen(state) {
     const g = sorted[i];
     const cardMeta = cardEls[i];
     cardMeta.el.classList.add('visible');
+    Sounds.reveal();
     document.getElementById('reveal-step').textContent = `Revealing ${g.player_name}…`;
 
     if (g.timed_out) {
@@ -853,7 +864,7 @@ function showFinalScreen(state) {
     </div>`;
   }).join('');
 
-  if (ranking.length > 1) spawnConfetti();
+  if (ranking.length > 1) { spawnConfetti(); Sounds.fanfare(); }
   updateRematchButton();
 }
 
@@ -878,6 +889,7 @@ function triggerPerfect(playerName) {
   document.getElementById('perfect-name').textContent = `${playerName} landed right on target — 5,000 pts!`;
   const el = document.getElementById('perfect-overlay');
   el.classList.add('show');
+  Sounds.perfect();
   spawnConfetti();
   setTimeout(() => el.classList.remove('show'), 3000);
 }
@@ -886,6 +898,7 @@ function showStreakBanner(playerName) {
   const el = document.getElementById('streak-banner');
   el.querySelector('#streak-name').textContent = playerName;
   el.classList.add('show');
+  Sounds.streak();
   setTimeout(() => el.classList.remove('show'), 2800);
 }
 
@@ -1116,6 +1129,7 @@ document.getElementById('confirm-btn').addEventListener('click', async () => {
   if (peekLayer && gameMap) { gameMap.removeLayer(peekLayer); peekLayer = null; }
   document.getElementById('peek-overlay').style.display = 'none';
 
+  Sounds.guess();
   const payload = await api('/api/guess', 'POST', pendingGuess);
   if (payload) applyPayload(payload);
 });
@@ -1143,5 +1157,11 @@ document.getElementById('back-start-btn').addEventListener('click', async () => 
 window.addEventListener('load', async () => {
   prefillRoomCodeFromQuery();
   await refreshFromServer();
+  const muteBtn = document.getElementById('mute-btn');
+  muteBtn.textContent = Sounds.isMuted() ? '🔇' : '🔊';
+  muteBtn.addEventListener('click', () => {
+    const muted = Sounds.toggleMute();
+    muteBtn.textContent = muted ? '🔇' : '🔊';
+  });
 });
 window.addEventListener('resize', invalidateMapsSoon);
