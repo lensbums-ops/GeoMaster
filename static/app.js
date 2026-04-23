@@ -577,12 +577,16 @@ function processState(state) {
   if (state.phase === 'category_pick') {
     showScreen('screen-game');
     stopTimer();
-    clearGuessMarker();
-    if (peekLayer && gameMap) { gameMap.removeLayer(peekLayer); peekLayer = null; }
-    document.getElementById('peek-overlay').style.display = 'none';
-    showCategoryPicker(state);
-    setGuessControlsForState(state);
-    invalidateMapsSoon();
+    // Only rebuild the category grid when something actually changed —
+    // rebuilding on every poll would destroy buttons mid-click.
+    if (phaseChanged || versionChanged) {
+      clearGuessMarker();
+      if (peekLayer && gameMap) { gameMap.removeLayer(peekLayer); peekLayer = null; }
+      document.getElementById('peek-overlay').style.display = 'none';
+      showCategoryPicker(state);
+      setGuessControlsForState(state);
+      invalidateMapsSoon();
+    }
     activeResultsKey = null;
     activeFinalKey = null;
     return;
