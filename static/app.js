@@ -290,9 +290,20 @@ function renderTimer() {
 
 async function handleTimeout() {
   if (!currentState || !currentState.can_guess) return;
-  Sounds.timeout();
-  const payload = await api('/api/timeout', 'POST', {}, { showErrors: false });
-  if (payload) applyPayload(payload);
+  if (pendingGuess) {
+    // Player placed a marker but didn't confirm — submit it automatically
+    const confirmBtn = document.getElementById('confirm-btn');
+    confirmBtn.disabled = true;
+    if (peekLayer && gameMap) { gameMap.removeLayer(peekLayer); peekLayer = null; }
+    document.getElementById('peek-overlay').style.display = 'none';
+    Sounds.guess();
+    const payload = await api('/api/guess', 'POST', pendingGuess, { showErrors: false });
+    if (payload) applyPayload(payload);
+  } else {
+    Sounds.timeout();
+    const payload = await api('/api/timeout', 'POST', {}, { showErrors: false });
+    if (payload) applyPayload(payload);
+  }
 }
 
 // ─── Render helpers ──────────────────────────────────────────────────────────
