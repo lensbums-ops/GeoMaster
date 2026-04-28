@@ -123,7 +123,8 @@ function applyPayload(payload) {
 // Maps
 function initGameMap() {
   if (gameMap) return;
-  gameMap = L.map('game-map', { center: [20, 0], zoom: 2, minZoom: 2, maxZoom: 10, worldCopyJump: false });
+  gameMap = L.map('game-map', { center: [20, 0], zoom: 2, minZoom: 2, maxZoom: 10, worldCopyJump: false, zoomControl: false });
+  L.control.zoom({ position: 'bottomright' }).addTo(gameMap);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd', noWrap: true,
   }).addTo(gameMap);
