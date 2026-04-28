@@ -66,6 +66,11 @@ async function api(url, method = 'GET', body = null, { showErrors = true } = {})
 
 // Boot / polling
 async function refreshFromServer() {
+  const payload = await api('/api/state', 'GET', null, { showErrors: false });
+  if (payload) applyPayload(payload);
+}
+
+async function bootstrapOnce() {
   const payload = await api('/api/bootstrap', 'GET', null, { showErrors: false });
   if (payload) applyPayload(payload);
 }
@@ -206,7 +211,7 @@ function showLobby(room) {
     ).join('');
     return `<div class="lobby-player">
       <div class="mini-dot" style="background:${player.color}"></div>
-      <div class="lobby-player-name">${player.name}</div>
+      <div class="lobby-player-name">${escapeHtml(player.name)}</div>
       ${tags}
     </div>`;
   }).join('');
@@ -385,7 +390,7 @@ function renderScores(state) {
     }
     return `<div class="score-row">
       <div class="mini-dot" style="background:${p.color}"></div>
-      <div class="score-name">${p.name}${fire}</div>
+      <div class="score-name">${escapeHtml(p.name)}${fire}</div>
       <div class="score-val">${p.total_score.toLocaleString()}</div>
       <div class="score-tag">${tag}</div>
     </div>`;
@@ -563,7 +568,7 @@ function processState(state) {
       triggerPerfect(state.perfect_event.player_name);
     }
   }
-  if (versionChanged && state.streak_event) {
+  if (versionChanged && state.streak_event && state.phase === 'results') {
     const key = `${state.version}:${state.streak_event.player_name}`;
     if (lastStreakEventKey !== key) {
       lastStreakEventKey = key;
@@ -687,7 +692,7 @@ async function showResultsScreen(state) {
     card.innerHTML = `
       <div class="rc-top">
         <span class="rc-dot" style="background:${g.player_color}"></span>
-        <span class="rc-name">${g.player_name}</span>
+        <span class="rc-name">${escapeHtml(g.player_name)}</span>
         ${badges.join('')}
       </div>
       <div class="rc-dist">${distNum}</div>
@@ -859,7 +864,7 @@ function showFinalScreen(state) {
       : `border:1px solid ${slot.player.color}55;`;
     return `<div class="podium-item${slot.isFirst ? ' podium-winner' : ''}">
       <div class="podium-medal">${slot.icon}</div>
-      <div class="podium-name" style="color:${slot.player.color}">${slot.player.name}</div>
+      <div class="podium-name" style="color:${slot.player.color}">${escapeHtml(slot.player.name)}</div>
       <div class="podium-score">${slot.player.total_score.toLocaleString()} pts</div>
       <div class="podium-bar" style="height:${slot.height}px;background:${slot.player.color}20;${border}${glow}"></div>
     </div>`;
@@ -874,7 +879,7 @@ function showFinalScreen(state) {
     return `<div class="final-row${isWinner ? ' final-row-winner' : ''}">
       <div class="final-rank">${medals[i] || '#' + (i + 1)}</div>
       <div class="mini-dot" style="background:${p.color}"></div>
-      <div class="final-name">${p.name}</div>
+      <div class="final-name">${escapeHtml(p.name)}</div>
       <div class="final-extra">${extras.join(' · ')}</div>
       <div class="final-score">${p.total_score.toLocaleString()} pts</div>
     </div>`;
@@ -1006,6 +1011,15 @@ async function revealDetectiveHint() {
 }
 
 // Utilities
+
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 // Normalize targetLng so the shorter arc relative to refLng is used (antimeridian fix).
 function nearLng(refLng, targetLng) {
@@ -1172,7 +1186,7 @@ document.getElementById('back-start-btn').addEventListener('click', async () => 
 
 window.addEventListener('load', async () => {
   prefillRoomCodeFromQuery();
-  await refreshFromServer();
+  await bootstrapOnce();
   const muteBtn = document.getElementById('mute-btn');
   muteBtn.textContent = Sounds.isMuted() ? '🔇' : '🔊';
   muteBtn.addEventListener('click', () => {

@@ -338,6 +338,8 @@ def evaluate_guess(
             "detective_multiplier": detective_progress["score_multiplier"],
             "timed_out": True,
         }
+        # Discard any pending joker flag so it doesn't carry into the next round
+        player.pop("joker_double_active", None)
         # Break streak on timeout
         _update_streak(state, player_index, km=None, timed_out=True)
 
