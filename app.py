@@ -120,6 +120,20 @@ def _sync_room_timeouts(room: dict[str, Any]) -> None:
     if not state:
         return
 
+    # On finished screen: mark players as disconnected if they haven't polled in 10s
+    if state.get("phase") == "finished":
+        cutoff = _now_ms() - 10_000
+        changed = False
+        for i, rp in enumerate(room["players"]):
+            if not rp.get("disconnected") and rp.get("last_seen_ms", 0) < cutoff:
+                rp["disconnected"] = True
+                if i < len(state["players"]):
+                    state["players"][i]["disconnected"] = True
+                changed = True
+        if changed:
+            _touch_room(room)
+        return
+
     # Auto-advance from results if host hasn't clicked within 15 seconds
     if state.get("phase") == "results":
         _set_results_deadline(state)
@@ -310,6 +324,11 @@ def get_state():
     room = _get_room()
     if not room:
         return jsonify({"room": None, "game": None}), 200
+    # Track when this player was last seen (used for AFK detection on final screen)
+    player_id = _ensure_player_id()
+    idx = _find_player_index(room, player_id)
+    if idx is not None:
+        room["players"][idx]["last_seen_ms"] = _now_ms()
     return jsonify(_payload(room)), 200
 
 
