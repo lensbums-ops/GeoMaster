@@ -247,6 +247,7 @@ def begin_next_round(state: dict[str, Any]) -> dict[str, Any]:
     state["streak_event"] = None
     state["perfect_event"] = None
     state["detective_progress"] = None
+    state["results_ends_at_ms"] = None
     return state
 
 

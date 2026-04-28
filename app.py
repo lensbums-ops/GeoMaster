@@ -28,6 +28,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-only-change-me")
 
 ROOMS: dict[str, dict[str, Any]] = {}
 ROUND_TIME_SECONDS = 30
+RESULTS_AUTO_ADVANCE_SECONDS = 15
 ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 ROOM_TTL_MS = 5 * 60 * 1000  # delete rooms inactive for 5 minutes
 
@@ -97,6 +98,11 @@ def _set_turn_deadline(state: dict[str, Any], *, reset: bool) -> None:
         state["turn_ends_at_ms"] = None
 
 
+def _set_results_deadline(state: dict[str, Any]) -> None:
+    if state.get("phase") == "results" and not state.get("results_ends_at_ms"):
+        state["results_ends_at_ms"] = _now_ms() + RESULTS_AUTO_ADVANCE_SECONDS * 1000
+
+
 def _clear_transient_events(state: dict[str, Any]) -> None:
     state["streak_event"] = None
     state["perfect_event"] = None
@@ -111,7 +117,23 @@ def _cleanup_stale_rooms() -> None:
 
 def _sync_room_timeouts(room: dict[str, Any]) -> None:
     state = room.get("game")
-    if not state or state.get("phase") != "guessing":
+    if not state:
+        return
+
+    # Auto-advance from results if host hasn't clicked within 15 seconds
+    if state.get("phase") == "results":
+        _set_results_deadline(state)
+        if _now_ms() >= state.get("results_ends_at_ms", 0):
+            state["results_ends_at_ms"] = None
+            _clear_transient_events(state)
+            state = begin_next_round(state)
+            _set_turn_deadline(state, reset=False)
+            _touch_game_state(state)
+            room["game"] = state
+            _touch_room(room)
+        return
+
+    if state.get("phase") != "guessing":
         return
 
     guessed = {g["player_index"] for g in state.get("round_guesses", [])}
