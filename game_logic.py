@@ -154,6 +154,7 @@ def create_game_state(players: list[str], rounds: int) -> dict[str, Any]:
         "phase": "setup",
         "question": None,
         "round_guesses": [],
+        "pending_guesses": {},
         "streak_event": None,
         "perfect_event": None,
         "country_pool": country_pool,
@@ -221,6 +222,7 @@ def start_round(state: dict[str, Any], chosen_mode: str) -> dict[str, Any]:
     """Begin a round — all players guess simultaneously."""
     state["question"] = build_question(chosen_mode, state)
     state["round_guesses"] = []
+    state["pending_guesses"] = {}
     state["streak_event"] = None
     state["perfect_event"] = None
     state["phase"] = "guessing"
@@ -244,6 +246,7 @@ def begin_next_round(state: dict[str, Any]) -> dict[str, Any]:
     state["phase"] = "category_pick"
     state["question"] = None
     state["round_guesses"] = []
+    state["pending_guesses"] = {}
     state["streak_event"] = None
     state["perfect_event"] = None
     state["detective_progress"] = None
@@ -509,6 +512,7 @@ def get_public_state(state: dict[str, Any], viewer_index: int | None = None) -> 
     During guessing phase, hide other players' guess locations and scores.
     """
     public = deepcopy(state)
+    public.pop("pending_guesses", None)
 
     # detective_progress is now a dict[player_index → progress] — expose only the viewer's own
     if isinstance(public.get("detective_progress"), dict):

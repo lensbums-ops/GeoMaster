@@ -108,6 +108,61 @@ def _clear_transient_events(state: dict[str, Any]) -> None:
     state["perfect_event"] = None
 
 
+def _parse_coordinates(payload: dict[str, Any]) -> tuple[float | None, float | None, str | None]:
+    try:
+        lat = float(payload["lat"])
+        lng = float(payload["lng"])
+    except (KeyError, ValueError, TypeError):
+        return None, None, "Invalid coordinates — provide lat and lng as numbers"
+
+    if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+        return None, None, "Coordinates out of valid range"
+
+    return lat, lng, None
+
+
+def _is_stale_round_payload(state: dict[str, Any], payload: dict[str, Any]) -> bool:
+    if "round" not in payload:
+        return False
+    try:
+        return int(payload["round"]) != int(state.get("current_round", 0))
+    except (ValueError, TypeError):
+        return True
+
+
+def _pending_guess_for(state: dict[str, Any], player_index: int) -> dict[str, Any] | None:
+    pending = state.get("pending_guesses") or {}
+    guess = pending.get(player_index) or pending.get(str(player_index))
+    if not isinstance(guess, dict):
+        return None
+    try:
+        return {"lat": float(guess["lat"]), "lng": float(guess["lng"])}
+    except (KeyError, ValueError, TypeError):
+        return None
+
+
+def _clear_pending_guess(state: dict[str, Any], player_index: int) -> None:
+    pending = state.get("pending_guesses")
+    if isinstance(pending, dict):
+        pending.pop(player_index, None)
+        pending.pop(str(player_index), None)
+
+
+def _evaluate_timeout_or_pending(state: dict[str, Any], player_index: int) -> dict[str, Any]:
+    pending = _pending_guess_for(state, player_index)
+    if pending:
+        state = evaluate_guess(
+            state,
+            player_index=player_index,
+            lat=pending["lat"],
+            lng=pending["lng"],
+        )
+    else:
+        state = evaluate_guess(state, player_index=player_index, lat=None, lng=None, timed_out=True)
+    _clear_pending_guess(state, player_index)
+    return state
+
+
 def _cleanup_stale_rooms() -> None:
     cutoff = _now_ms() - ROOM_TTL_MS
     stale = [code for code, room in list(ROOMS.items()) if room.get("updated_at_ms", 0) < cutoff]
@@ -160,7 +215,7 @@ def _sync_room_timeouts(room: dict[str, Any]) -> None:
     if disconnected_unguessed:
         _clear_transient_events(state)
         for pi in disconnected_unguessed:
-            state = evaluate_guess(state, player_index=pi, lat=None, lng=None, timed_out=True)
+            state = _evaluate_timeout_or_pending(state, pi)
         state = next_player_or_reveal(state)
         _set_turn_deadline(state, reset=False)
         _touch_game_state(state)
@@ -184,7 +239,7 @@ def _sync_room_timeouts(room: dict[str, Any]) -> None:
 
     _clear_transient_events(state)
     for pi in unguessed:
-        state = evaluate_guess(state, player_index=pi, lat=None, lng=None, timed_out=True)
+        state = _evaluate_timeout_or_pending(state, pi)
 
     state = next_player_or_reveal(state)
     _touch_game_state(state)
@@ -544,17 +599,15 @@ def submit_guess():
         return _err("You have already guessed this round", 403)
 
     payload = request.get_json(force=True)
-    try:
-        lat = float(payload["lat"])
-        lng = float(payload["lng"])
-    except (KeyError, ValueError, TypeError):
-        return _err("Invalid coordinates — provide lat and lng as numbers")
-
-    if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
-        return _err("Coordinates out of valid range")
+    if _is_stale_round_payload(state, payload):
+        return _err("Stale guess placement")
+    lat, lng, error = _parse_coordinates(payload)
+    if error:
+        return _err(error)
 
     _clear_transient_events(state)
     state = evaluate_guess(state, player_index=viewer_index, lat=lat, lng=lng)
+    _clear_pending_guess(state, viewer_index)
     state = next_player_or_reveal(state)
     _set_turn_deadline(state, reset=False)
     _touch_game_state(state)
@@ -563,9 +616,9 @@ def submit_guess():
     return _ok(room)
 
 
-@app.post("/api/timeout")
-def submit_timeout():
-    """Timer expired — register phantom guess with penalty for current player."""
+@app.post("/api/guess/placement")
+def save_guess_placement():
+    """Remember the current marker so timeout can auto-confirm it."""
     room, state = _current_game_room()
     if not room or not state:
         return _err("No active game", 404)
@@ -581,8 +634,49 @@ def submit_timeout():
     if viewer_index in guessed:
         return _err("You have already guessed this round", 403)
 
+    payload = request.get_json(force=True)
+    if _is_stale_round_payload(state, payload):
+        return _err("Stale guess placement")
+    lat, lng, error = _parse_coordinates(payload)
+    if error:
+        return _err(error)
+
+    state.setdefault("pending_guesses", {})[viewer_index] = {"lat": lat, "lng": lng}
+    _touch_game_state(state)
+    room["game"] = state
+    _touch_room(room)
+    return _ok(room)
+
+
+@app.post("/api/timeout")
+def submit_timeout():
+    """Timer expired — confirm placed marker or register phantom penalty."""
+    room, state = _current_game_room()
+    if not room or not state:
+        return _err("No active game", 404)
+
+    if state["phase"] != "guessing":
+        return _err("Not in guessing phase")
+
+    player_id = _ensure_player_id()
+    viewer_index = _find_player_index(room, player_id)
+    if viewer_index is None:
+        return _err("You are not in this room", 403)
+    guessed = {g["player_index"] for g in state.get("round_guesses", [])}
+    if viewer_index in guessed:
+        return _err("You have already guessed this round", 403)
+
+    payload = request.get_json(silent=True) or {}
+    if "lat" in payload or "lng" in payload:
+        if _is_stale_round_payload(state, payload):
+            return _err("Stale guess placement")
+        lat, lng, error = _parse_coordinates(payload)
+        if error:
+            return _err(error)
+        state.setdefault("pending_guesses", {})[viewer_index] = {"lat": lat, "lng": lng}
+
     _clear_transient_events(state)
-    state = evaluate_guess(state, player_index=viewer_index, lat=None, lng=None, timed_out=True)
+    state = _evaluate_timeout_or_pending(state, viewer_index)
     state = next_player_or_reveal(state)
     _set_turn_deadline(state, reset=False)
     _touch_game_state(state)

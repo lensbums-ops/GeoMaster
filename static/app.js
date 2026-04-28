@@ -166,7 +166,8 @@ function onMapClick(e) {
     return;
   }
 
-  pendingGuess = { lat, lng };
+  pendingGuess = { lat, lng, round: currentState.current_round };
+  api('/api/guess/placement', 'POST', pendingGuess, { showErrors: false });
   if (guessMarker) gameMap.removeLayer(guessMarker);
 
   const p = currentState.players[currentState.viewer_index] ?? currentState.players[0];

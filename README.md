@@ -44,7 +44,7 @@ geomaster/
 - Linear scoring: 0 km → 5 000 pts, 10 000 km → 0 pts; inside target → 5 000 pts
 - Streak tracking and bonus awards
 - Joker logic (×2 double, peek)
-- Phantom guess + penalty on timeout or disconnect
+- Placed markers are auto-confirmed on timeout; no marker means phantom + penalty
 - Hides other players' guesses until everyone has submitted
 - Cleans up stale rooms automatically
 
@@ -106,7 +106,7 @@ SECRET_KEY=choose-a-long-random-secret
 | POST | `/api/start` | Host starts the match |
 | POST | `/api/category` | Picker chooses question mode |
 | POST | `/api/guess` | Submit a lat/lng guess |
-| POST | `/api/timeout` | Client-side timeout (phantom guess) |
+| POST | `/api/timeout` | Client-side timeout; confirms placed marker or applies phantom penalty |
 | POST | `/api/detective/hint` | Reveal next detective clue |
 | POST | `/api/next-round` | Host advances to next round |
 | POST | `/api/joker/double` | Activate ×2 joker |
