@@ -343,7 +343,7 @@ function renderClue(question) {
   if (mode === 'country_flag') {
     html = `<div class="flag-big">${flagEmoji(item.iso)}</div>`;
   } else if (mode === 'country_capital') {
-    html = `<div class="cap-box"><div class="cap-name">${item.capital}</div><div class="cap-sub">Capital city clue</div></div>`;
+    html = `<div class="cap-box"><div class="cap-name">${item.capital}</div></div>`;
   } else if (mode === 'country_stats') {
     html = `<div class="stats-list">${item.clues.map((c, i) =>
       `<div class="stat-row"><div class="stat-n">${i + 1}</div><div>${c}</div></div>`).join('')}</div>`;
@@ -1167,6 +1167,12 @@ document.getElementById('confirm-btn').addEventListener('click', async () => {
 document.getElementById('joker-double-btn').addEventListener('click', activateDouble);
 document.getElementById('joker-peek-btn').addEventListener('click', activatePeek);
 document.getElementById('detective-hint-btn').addEventListener('click', revealDetectiveHint);
+
+document.getElementById('game-leave-btn').addEventListener('click', async () => {
+  if (!confirm('Leave the game? Your turns will be auto-submitted as phantom guesses.')) return;
+  const payload = await api('/api/room/leave', 'POST', {}, { showErrors: false });
+  if (payload) applyPayload(payload);
+});
 
 document.getElementById('next-round-btn').addEventListener('click', async () => {
   clearRevealLayers();
