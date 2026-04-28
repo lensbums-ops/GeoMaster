@@ -118,7 +118,7 @@ function applyPayload(payload) {
 // Maps
 function initGameMap() {
   if (gameMap) return;
-  gameMap = L.map('game-map', { center: [20, 0], zoom: 2, minZoom: 2, maxZoom: 6, worldCopyJump: false });
+  gameMap = L.map('game-map', { center: [20, 0], zoom: 2, minZoom: 2, maxZoom: 10, worldCopyJump: false });
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd', noWrap: true,
   }).addTo(gameMap);
@@ -704,7 +704,7 @@ async function showResultsScreen(state) {
   });
 
   const bounds = [[q.answer_lat - 2, q.answer_lng - 2], [q.answer_lat + 2, q.answer_lng + 2]];
-  const targetStyle = { color: '#f1c40f', weight: 2, fillColor: '#f1c40f', fillOpacity: 0.2 };
+  const targetStyle = { color: '#f1c40f', weight: 3, fillColor: '#f1c40f', fillOpacity: 0.3 };
 
   if (q.kind === 'country' && q.answer_iso) {
     try {
@@ -944,7 +944,7 @@ async function activatePeek() {
 
   if (peekLayer && gameMap) { gameMap.removeLayer(peekLayer); peekLayer = null; }
 
-  const peekStyle = { color: '#9b59b6', weight: 3, fillColor: '#9b59b6', fillOpacity: 0.22, dashArray: '6,4' };
+  const peekStyle = { color: '#9b59b6', weight: 4, fillColor: '#9b59b6', fillOpacity: 0.3, dashArray: '6,4' };
 
   if (target.kind === 'country' && target.iso) {
     try {
