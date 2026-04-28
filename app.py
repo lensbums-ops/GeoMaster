@@ -32,7 +32,7 @@ ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 ROOM_TTL_MS = 5 * 60 * 1000  # delete rooms inactive for 5 minutes
 
 
-# ─── Time / room helpers ──────────────────────────────────────────────────────
+# Time / room helpers
 def _now_ms() -> int:
     return int(time.time() * 1000)
 
@@ -267,13 +267,13 @@ def _current_game_room() -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     return room, state
 
 
-# ─── Pages ────────────────────────────────────────────────────────────────────
+# Pages
 @app.get("/")
 def index():
     return render_template("index.html")
 
 
-# ─── Room lifecycle ───────────────────────────────────────────────────────────
+# Room lifecycle
 @app.get("/api/bootstrap")
 def bootstrap():
     room = _get_room()
@@ -421,7 +421,7 @@ def leave_room():
     return jsonify({"room": None, "game": None}), 200
 
 
-# ─── Game lifecycle ───────────────────────────────────────────────────────────
+# Game lifecycle
 @app.post("/api/start")
 def start_game():
     """Host starts a room game and jumps straight to category_pick for round 1."""
@@ -667,7 +667,7 @@ def rematch():
     return _ok(room)
 
 
-# ─── Joker endpoints ──────────────────────────────────────────────────────────
+# Joker endpoints
 @app.post("/api/joker/double")
 def activate_double():
     """Activate the ×2 joker for the current player."""
@@ -738,7 +738,7 @@ def activate_peek():
     )
 
 
-# ─── Country border GeoJSON ───────────────────────────────────────────────────
+# Country border GeoJSON
 @app.get("/api/border/<iso>")
 def get_border(iso: str):
     from game_logic import _COUNTRY_BORDERS

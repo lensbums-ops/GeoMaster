@@ -8,7 +8,7 @@
    - reveal animations and local polish
 */
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// Constants
 const POLL_INTERVAL_MS = 1500;
 const MAX_DISTANCE_KM = 10000;
 const CATEGORY_DEFS = [
@@ -21,7 +21,7 @@ const CATEGORY_DEFS = [
   { mode: 'detective_city',   icon: '🕵️', name: 'Detective City',  desc: 'Unlock up to 3 clues — fewer clues means a bigger score multiplier' },
 ];
 
-// ─── State ───────────────────────────────────────────────────────────────────
+// State
 let currentRoom = null;
 let currentState = null;
 let syncInterval = null;
@@ -43,7 +43,7 @@ let activeFinalKey = null;
 let lastPerfectEventKey = null;
 let lastStreakEventKey = null;
 
-// ─── API helper ──────────────────────────────────────────────────────────────
+// API helper
 async function api(url, method = 'GET', body = null, { showErrors = true } = {}) {
   const res = await fetch(url, {
     method,
@@ -64,7 +64,7 @@ async function api(url, method = 'GET', body = null, { showErrors = true } = {})
   return payload;
 }
 
-// ─── Boot / polling ──────────────────────────────────────────────────────────
+// Boot / polling
 async function refreshFromServer() {
   const payload = await api('/api/bootstrap', 'GET', null, { showErrors: false });
   if (payload) applyPayload(payload);
@@ -115,7 +115,7 @@ function applyPayload(payload) {
   processState(payload.game);
 }
 
-// ─── Maps ────────────────────────────────────────────────────────────────────
+// Maps
 function initGameMap() {
   if (gameMap) return;
   gameMap = L.map('game-map', { center: [20, 0], zoom: 2, minZoom: 2, maxZoom: 6, worldCopyJump: false });
@@ -186,7 +186,7 @@ function clearGuessMarker() {
   }
 }
 
-// ─── Lobby ───────────────────────────────────────────────────────────────────
+// Lobby
 function showLobby(room) {
   showScreen('screen-lobby');
 
@@ -225,7 +225,7 @@ function showLobby(room) {
       : `${room.host_name} controls the rounds and starts the match.`;
 }
 
-// ─── Timer ───────────────────────────────────────────────────────────────────
+// Timer
 function startTimer(deadlineMs, canAutoTimeout) {
   if (!deadlineMs) {
     stopTimer();
@@ -306,7 +306,7 @@ async function handleTimeout() {
   }
 }
 
-// ─── Render helpers ──────────────────────────────────────────────────────────
+// Render helpers
 function renderClue(question) {
   const box = document.getElementById('clue-body');
   const lbl = document.getElementById('clue-label');
@@ -543,7 +543,7 @@ function hideCategoryPicker() {
   document.getElementById('cat-overlay').classList.remove('active');
 }
 
-// ─── Main state processor ────────────────────────────────────────────────────
+// Main state processor
 function processState(state) {
   initGameMap();
 
@@ -555,7 +555,8 @@ function processState(state) {
 
   currentState = state;
 
-  if (versionChanged && state.perfect_event) {
+  if (versionChanged && state.perfect_event && state.phase === 'results' &&
+      state.perfect_event.player_index === state.viewer_index) {
     const key = `${state.version}:${state.perfect_event.player_name}`;
     if (lastPerfectEventKey !== key) {
       lastPerfectEventKey = key;
@@ -639,7 +640,7 @@ function processState(state) {
   }
 }
 
-// ─── Results / reveal ────────────────────────────────────────────────────────
+// Results / reveal
 async function showResultsScreen(state) {
   showScreen('screen-results');
   initResultsMap();
@@ -825,7 +826,7 @@ async function showResultsScreen(state) {
   }
 }
 
-// ─── Final screen ────────────────────────────────────────────────────────────
+// Final screen
 function showFinalScreen(state) {
   showScreen('screen-final');
   const ranking = [...state.players].sort((a, b) => b.total_score - a.total_score);
@@ -899,7 +900,7 @@ function updateRematchButton() {
   }
 }
 
-// ─── Animations ──────────────────────────────────────────────────────────────
+// Animations
 function triggerPerfect(playerName) {
   document.getElementById('perfect-name').textContent = `${playerName} landed right on target — 5,000 pts!`;
   const el = document.getElementById('perfect-overlay');
@@ -931,7 +932,7 @@ function spawnConfetti() {
   setTimeout(() => { c.innerHTML = ''; }, 4000);
 }
 
-// ─── Jokers / detective actions ──────────────────────────────────────────────
+// Jokers / detective actions
 async function activatePeek() {
   if (!currentState || !currentState.can_guess) return;
   const payload = await api('/api/joker/peek', 'POST', {});
@@ -1004,7 +1005,7 @@ async function revealDetectiveHint() {
   }
 }
 
-// ─── Utilities ───────────────────────────────────────────────────────────────
+// Utilities
 
 // Normalize targetLng so the shorter arc relative to refLng is used (antimeridian fix).
 function nearLng(refLng, targetLng) {
@@ -1066,7 +1067,7 @@ function prefillRoomCodeFromQuery() {
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-// ─── Room actions ────────────────────────────────────────────────────────────
+// Room actions
 async function createRoom() {
   const name = document.getElementById('create-name').value.trim();
   if (!name) {
@@ -1121,7 +1122,7 @@ async function copyInviteLink() {
   }
 }
 
-// ─── Event listeners ─────────────────────────────────────────────────────────
+// Event listeners
 document.getElementById('create-room-btn').addEventListener('click', createRoom);
 document.getElementById('join-room-btn').addEventListener('click', joinRoom);
 document.getElementById('copy-room-btn').addEventListener('click', copyInviteLink);

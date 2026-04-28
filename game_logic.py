@@ -12,7 +12,7 @@ import random
 from copy import deepcopy
 from typing import Any
 
-# ── Optional Shapely for polygon-based country borders ────────────────────────
+# Optional Shapely for polygon-based country borders
 try:
     from shapely.geometry import Point, shape
     from shapely.ops import nearest_points as _shapely_nearest
@@ -48,7 +48,7 @@ from data import (
     QUESTION_MODES,
 )
 
-# ─── Constants ────────────────────────────────────────────────────────────────
+# Constants
 MAX_DISTANCE_KM = 10_000   # 0 km = 5000 pts, 10000 km = 0 pts (linear)
 STREAK_THRESHOLD_KM = 1_000  # under this = good round for streak
 STREAK_REQUIRED = 3          # rounds in a row needed to earn bonus
@@ -58,7 +58,7 @@ DETECTIVE_MAX_CLUES = 3
 DETECTIVE_MULTIPLIERS = {1: 3, 2: 2, 3: 1}
 
 
-# ─── Maths helpers ────────────────────────────────────────────────────────────
+# Maths helpers
 def haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> int:
     """Great-circle distance in km between two lat/lng points."""
     r = 6_371
@@ -115,7 +115,7 @@ def _distance_to_country(lat: float, lng: float, iso: str) -> tuple[int | None, 
     return dist_km, False
 
 
-# ─── Game state creation ───────────────────────────────────────────────────────
+# Game state creation
 def create_game_state(players: list[str], rounds: int) -> dict[str, Any]:
     """Create a fresh game state dict."""
     # Edge case: no names provided
@@ -163,7 +163,7 @@ def create_game_state(players: list[str], rounds: int) -> dict[str, Any]:
     }
 
 
-# ─── Question generation ──────────────────────────────────────────────────────
+# Question generation
 def build_question(mode: str, state: dict[str, Any]) -> dict[str, Any]:
     """Build a question dict for the given mode.
 
@@ -216,7 +216,7 @@ def get_category_picker_index(state: dict[str, Any]) -> int | None:
     return (current_round - 1) % len(players)
 
 
-# ─── Round management ─────────────────────────────────────────────────────────
+# Round management
 def start_round(state: dict[str, Any], chosen_mode: str) -> dict[str, Any]:
     """Begin a round — all players guess simultaneously."""
     state["question"] = build_question(chosen_mode, state)
@@ -269,7 +269,7 @@ def reveal_detective_hint(state: dict[str, Any], player_index: int) -> dict[str,
     return state
 
 
-# ─── Jokers ───────────────────────────────────────────────────────────────────
+# Jokers
 def use_joker_double(state: dict[str, Any], player_index: int | None = None) -> dict[str, Any]:
     """Activate the ×2 joker for the given player."""
     idx = player_index if player_index is not None else state["current_player_index"]
@@ -299,7 +299,7 @@ def use_joker_peek(state: dict[str, Any], player_index: int | None = None) -> di
     return state
 
 
-# ─── Guess evaluation ─────────────────────────────────────────────────────────
+# Guess evaluation
 def evaluate_guess(
     state: dict[str, Any],
     player_index: int,
@@ -316,7 +316,7 @@ def evaluate_guess(
         progress_map.get(player_index) if isinstance(progress_map, dict) else progress_map
     ) or _fresh_detective_progress()
 
-    # ── Timeout / no guess ──────────────────────────────────────────────────
+    # Timeout / no guess
     if timed_out or lat is None or lng is None:
         ocean = random.choice(OCEAN_POINTS)
         score = -TIMEOUT_PENALTY_PTS
@@ -340,7 +340,7 @@ def evaluate_guess(
         # Break streak on timeout
         _update_streak(state, player_index, km=None, timed_out=True)
 
-    # ── Valid guess ──────────────────────────────────────────────────────────
+    # Valid guess
     else:
         # Edge case: coordinates out of valid range
         lat = max(-90.0, min(90.0, lat))
@@ -396,6 +396,7 @@ def evaluate_guess(
             state["perfect_event"] = {
                 "player_name": player["name"],
                 "player_color": player["color"],
+                "player_index": player_index,
             }
 
         _update_streak(state, player_index, km=dist_km, timed_out=False)
@@ -430,7 +431,7 @@ def _update_streak(
         }
 
 
-# ─── Turn / phase transitions ─────────────────────────────────────────────────
+# Turn / phase transitions
 def next_player_or_reveal(state: dict[str, Any]) -> dict[str, Any]:
     """Move to results once every active (non-disconnected) player has guessed."""
     active_indices = {
@@ -458,7 +459,7 @@ def next_player_or_reveal(state: dict[str, Any]) -> dict[str, Any]:
     return state
 
 
-# ─── Public state (safe to send to client) ────────────────────────────────────
+# Public state (safe to send to client)
 def _public_question(
     question: dict[str, Any],
     *,
