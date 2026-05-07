@@ -32,8 +32,6 @@ let resultsMap = null;
 let guessMarker = null;
 let pendingGuess = null;
 let revealLayers = [];
-let worldBordersGeoJson = null;
-let worldBordersPromise = null;
 let peekLayer = null;
 
 let timerInterval = null;
@@ -131,7 +129,6 @@ function initGameMap() {
   L.tileLayer(BASEMAP_NO_LABELS, {
     subdomains: 'abcd', noWrap: true,
   }).addTo(gameMap);
-  addWorldBorders(gameMap);
   gameMap.on('click', onMapClick);
 }
 
@@ -141,37 +138,6 @@ function initResultsMap() {
   L.tileLayer(BASEMAP_NO_LABELS, {
     subdomains: 'abcd', noWrap: true,
   }).addTo(resultsMap);
-  addWorldBorders(resultsMap);
-}
-
-function getWorldBorders() {
-  if (worldBordersGeoJson) return Promise.resolve(worldBordersGeoJson);
-  if (!worldBordersPromise) {
-    worldBordersPromise = fetch('/api/borders')
-      .then(res => res.ok ? res.json() : null)
-      .then(geojson => {
-        worldBordersGeoJson = geojson;
-        return geojson;
-      })
-      .catch(() => null);
-  }
-  return worldBordersPromise;
-}
-
-async function addWorldBorders(map) {
-  const geojson = await getWorldBorders();
-  if (!geojson || !map) return;
-
-  const layer = L.geoJSON(geojson, {
-    interactive: false,
-    style: {
-      color: '#6f879b',
-      weight: 0.65,
-      opacity: 0.45,
-      fillOpacity: 0,
-    },
-  }).addTo(map);
-  layer.bringToBack();
 }
 
 function addCountryNameLabel(map, country, color = '#102033') {
