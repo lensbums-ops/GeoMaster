@@ -48,6 +48,12 @@ from data import (
     QUESTION_MODES,
 )
 
+COUNTRY_NAMES_BY_ISO = {
+    country["iso"].lower(): country["name"]
+    for country in COUNTRIES
+    if country.get("iso") and country.get("name")
+}
+
 # Constants
 MAX_DISTANCE_KM = 10_000   # 0 km = 5000 pts, 10000 km = 0 pts (linear)
 STREAK_THRESHOLD_KM = 1_000  # under this = good round for streak
@@ -113,6 +119,45 @@ def _distance_to_country(lat: float, lng: float, iso: str) -> tuple[int | None, 
     nearest_pt = _shapely_nearest(geom, point)[0]
     dist_km = haversine_km(lat, lng, nearest_pt.y, nearest_pt.x)
     return dist_km, False
+
+
+def _country_at_point(lat: float, lng: float) -> dict[str, Any] | None:
+    """Return display metadata for the country containing a point, if known."""
+    if not _COUNTRY_BORDERS:
+        return None
+
+    point = Point(lng, lat)
+    for iso, geom in _COUNTRY_BORDERS.items():
+        if not geom.covers(point):
+            continue
+
+        label_point = geom.representative_point()
+        return {
+            "iso": iso,
+            "name": COUNTRY_NAMES_BY_ISO.get(iso, iso.upper()),
+            "label_lat": label_point.y,
+            "label_lng": label_point.x,
+        }
+
+    nearest_country = None
+    nearest_km = None
+    for country in COUNTRIES:
+        if country.get("kind") != "country":
+            continue
+        km = haversine_km(lat, lng, country["lat"], country["lng"])
+        if km <= country.get("radius_km", 0) and (nearest_km is None or km < nearest_km):
+            nearest_country = country
+            nearest_km = km
+
+    if nearest_country:
+        return {
+            "iso": nearest_country["iso"].lower(),
+            "name": nearest_country["name"],
+            "label_lat": nearest_country["lat"],
+            "label_lng": nearest_country["lng"],
+        }
+
+    return None
 
 
 # Game state creation
@@ -340,6 +385,7 @@ def evaluate_guess(
             "detective_clues_used": detective_progress["revealed_clues"],
             "detective_multiplier": detective_progress["score_multiplier"],
             "timed_out": True,
+            "guessed_country": None,
         }
         # Discard any pending joker flag so it doesn't carry into the next round
         player.pop("joker_double_active", None)
@@ -375,6 +421,7 @@ def evaluate_guess(
         # ×2 joker
         double_used = player.pop("joker_double_active", False)
         final_score = base_score * 2 if double_used else base_score
+        guessed_country = _country_at_point(lat, lng)
 
         # Track best distance
         if player["best_round_km"] is None or dist_km < player["best_round_km"]:
@@ -395,6 +442,7 @@ def evaluate_guess(
             "detective_clues_used": detective_progress["revealed_clues"],
             "detective_multiplier": detective_multiplier,
             "timed_out": False,
+            "guessed_country": guessed_country,
         }
 
         # Perfect guess event
@@ -541,6 +589,7 @@ def get_public_state(state: dict[str, Any], viewer_index: int | None = None) -> 
             guess["inside_target"] = None
             guess["phantom_lat"] = None
             guess["phantom_lng"] = None
+            guess["guessed_country"] = None
 
     # Clear one-shot events after reading
     streak_event = public.pop("streak_event", None)

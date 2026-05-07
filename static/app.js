@@ -11,6 +11,7 @@
 // Constants
 const POLL_INTERVAL_MS = 1500;
 const MAX_DISTANCE_KM = 10000;
+const BASEMAP_NO_LABELS = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png';
 const CATEGORY_DEFS = [
   { mode: 'country_flag',     icon: '🚩', name: 'Country Flag',    desc: 'Identify the country from its flag' },
   { mode: 'country_capital',  icon: '🏙️', name: 'Capital City',    desc: 'Which country has this capital?' },
@@ -127,7 +128,7 @@ function initGameMap() {
   if (gameMap) return;
   gameMap = L.map('game-map', { center: [20, 0], zoom: 2, minZoom: 2, maxZoom: 10, worldCopyJump: false, zoomControl: false });
   L.control.zoom({ position: 'bottomright' }).addTo(gameMap);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+  L.tileLayer(BASEMAP_NO_LABELS, {
     subdomains: 'abcd', noWrap: true,
   }).addTo(gameMap);
   addWorldBorders(gameMap);
@@ -137,7 +138,7 @@ function initGameMap() {
 function initResultsMap() {
   if (resultsMap) { resultsMap.remove(); resultsMap = null; }
   resultsMap = L.map('results-map', { center: [20, 0], zoom: 2 });
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  L.tileLayer(BASEMAP_NO_LABELS, {
     subdomains: 'abcd', noWrap: true,
   }).addTo(resultsMap);
   addWorldBorders(resultsMap);
@@ -164,13 +165,28 @@ async function addWorldBorders(map) {
   const layer = L.geoJSON(geojson, {
     interactive: false,
     style: {
-      color: '#243f5f',
-      weight: 1.15,
-      opacity: 0.85,
+      color: '#6f879b',
+      weight: 0.65,
+      opacity: 0.45,
       fillOpacity: 0,
     },
   }).addTo(map);
   layer.bringToBack();
+}
+
+function addCountryNameLabel(map, country, color = '#102033') {
+  if (!country || !country.name || country.label_lat == null || country.label_lng == null) return null;
+
+  const marker = L.marker([country.label_lat, country.label_lng], {
+    interactive: false,
+    icon: L.divIcon({
+      className: '',
+      html: `<div class="country-result-label" style="--label-color:${color}">${escapeHtml(country.name)}</div>`,
+      iconSize: [120, 24],
+      iconAnchor: [60, 12],
+    }),
+  }).addTo(map);
+  return marker;
 }
 
 function invalidateMapsSoon() {
@@ -774,6 +790,31 @@ async function showResultsScreen(state) {
     } catch (_) {}
   }
 
+  const shownCountryLabels = new Set();
+  if (q.kind === 'country' && q.answer_iso) {
+    const answerLabel = addCountryNameLabel(resultsMap, {
+      iso: q.answer_iso,
+      name: q.answer_name,
+      label_lat: q.answer_lat,
+      label_lng: q.answer_lng,
+    }, '#8d6b00');
+    if (answerLabel) {
+      revealLayers.push(answerLabel);
+      shownCountryLabels.add(q.answer_iso.toLowerCase());
+    }
+  }
+
+  sorted.forEach(g => {
+    const country = g.guessed_country;
+    if (!country?.iso || shownCountryLabels.has(country.iso)) return;
+
+    const label = addCountryNameLabel(resultsMap, country, g.player_color);
+    if (label) {
+      revealLayers.push(label);
+      shownCountryLabels.add(country.iso);
+    }
+  });
+
   const starMarker = L.marker([q.answer_lat, q.answer_lng], {
     icon: L.divIcon({
       className: '',
@@ -813,7 +854,7 @@ async function showResultsScreen(state) {
           iconSize: [20, 20], iconAnchor: [10, 10],
         }),
       }).addTo(resultsMap)
-        .bindPopup(`<strong>${g.player_name}</strong><br>${g.inside_target ? '🎯 Inside target!' : `${g.distance_km?.toLocaleString()} km away`}<br>+${g.round_score?.toLocaleString()} pts`)
+        .bindPopup(`<strong>${g.player_name}</strong><br>${g.guessed_country?.name ? `Guessed in ${escapeHtml(g.guessed_country.name)}<br>` : ''}${g.inside_target ? '🎯 Inside target!' : `${g.distance_km?.toLocaleString()} km away`}<br>+${g.round_score?.toLocaleString()} pts`)
         .openPopup();
       revealLayers.push(gm);
 
