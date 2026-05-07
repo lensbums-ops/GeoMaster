@@ -425,6 +425,24 @@ button { border: none; cursor: pointer; transition: .15s ease; }
     0 2px 6px rgba(0,0,0,.22);
   white-space: nowrap;
 }
+.target-answer-label {
+  display: inline-flex;
+  align-items: center;
+  max-width: 170px;
+  min-height: 30px;
+  padding: 7px 11px;
+  border: 1px solid rgba(241,196,15,.4);
+  border-radius: 999px;
+  background: rgba(7,12,24,.88);
+  box-shadow: 0 8px 22px rgba(0,0,0,.28);
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .reveal-top {
   position: absolute; top: 0; left: 0; right: 0; z-index: 1200;
   display: flex; align-items: center; justify-content: space-between;

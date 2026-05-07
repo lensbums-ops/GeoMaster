@@ -155,6 +155,19 @@ function addCountryNameLabel(map, country, color = '#102033') {
   return marker;
 }
 
+function addTargetAnswerLabel(map, lat, lng, answerName) {
+  const marker = L.marker([lat, lng], {
+    interactive: false,
+    icon: L.divIcon({
+      className: '',
+      html: `<div class="target-answer-label">${escapeHtml(answerName)}</div>`,
+      iconSize: [180, 34],
+      iconAnchor: [-20, 28],
+    }),
+  }).addTo(map);
+  return marker;
+}
+
 function invalidateMapsSoon() {
   requestAnimationFrame(() => {
     if (gameMap && document.getElementById('screen-game').classList.contains('active')) {
@@ -758,16 +771,7 @@ async function showResultsScreen(state) {
 
   const shownCountryLabels = new Set();
   if (q.kind === 'country' && q.answer_iso) {
-    const answerLabel = addCountryNameLabel(resultsMap, {
-      iso: q.answer_iso,
-      name: q.answer_name,
-      label_lat: q.answer_lat,
-      label_lng: q.answer_lng,
-    }, '#8d6b00');
-    if (answerLabel) {
-      revealLayers.push(answerLabel);
-      shownCountryLabels.add(q.answer_iso.toLowerCase());
-    }
+    shownCountryLabels.add(q.answer_iso.toLowerCase());
   }
 
   sorted.forEach(g => {
@@ -787,8 +791,12 @@ async function showResultsScreen(state) {
       html: `<div style="font-size:28px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,.6))">⭐</div>`,
       iconSize: [28, 28], iconAnchor: [14, 14],
     }),
-  }).addTo(resultsMap).bindPopup(`<strong>${q.answer_name}</strong><br>Target`).openPopup();
+  }).addTo(resultsMap);
   revealLayers.push(starMarker);
+
+  const targetLabel = addTargetAnswerLabel(resultsMap, q.answer_lat, q.answer_lng, q.answer_name);
+  revealLayers.push(targetLabel);
+
   resultsMap.fitBounds(bounds, { padding: [40, 40] });
 
   await wait(700);
