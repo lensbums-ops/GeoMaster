@@ -31,6 +31,8 @@ let resultsMap = null;
 let guessMarker = null;
 let pendingGuess = null;
 let revealLayers = [];
+let worldBordersGeoJson = null;
+let worldBordersPromise = null;
 let peekLayer = null;
 
 let timerInterval = null;
@@ -128,15 +130,47 @@ function initGameMap() {
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd', noWrap: true,
   }).addTo(gameMap);
+  addWorldBorders(gameMap);
   gameMap.on('click', onMapClick);
 }
 
 function initResultsMap() {
   if (resultsMap) { resultsMap.remove(); resultsMap = null; }
   resultsMap = L.map('results-map', { center: [20, 0], zoom: 2 });
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd', noWrap: true,
   }).addTo(resultsMap);
+  addWorldBorders(resultsMap);
+}
+
+function getWorldBorders() {
+  if (worldBordersGeoJson) return Promise.resolve(worldBordersGeoJson);
+  if (!worldBordersPromise) {
+    worldBordersPromise = fetch('/api/borders')
+      .then(res => res.ok ? res.json() : null)
+      .then(geojson => {
+        worldBordersGeoJson = geojson;
+        return geojson;
+      })
+      .catch(() => null);
+  }
+  return worldBordersPromise;
+}
+
+async function addWorldBorders(map) {
+  const geojson = await getWorldBorders();
+  if (!geojson || !map) return;
+
+  const layer = L.geoJSON(geojson, {
+    interactive: false,
+    style: {
+      color: '#243f5f',
+      weight: 1.15,
+      opacity: 0.85,
+      fillOpacity: 0,
+    },
+  }).addTo(map);
+  layer.bringToBack();
 }
 
 function invalidateMapsSoon() {

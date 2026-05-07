@@ -31,6 +31,7 @@ ROUND_TIME_SECONDS = 30
 RESULTS_AUTO_ADVANCE_SECONDS = 15
 ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 ROOM_TTL_MS = 5 * 60 * 1000  # delete rooms inactive for 5 minutes
+WORLD_BORDERS_GEOJSON: dict[str, Any] | None = None
 
 
 # Time / room helpers
@@ -874,6 +875,30 @@ def activate_peek():
 
 
 # Country border GeoJSON
+@app.get("/api/borders")
+def get_borders():
+    """Return all available country borders as a GeoJSON FeatureCollection."""
+    global WORLD_BORDERS_GEOJSON
+
+    if WORLD_BORDERS_GEOJSON is None:
+        from game_logic import _COUNTRY_BORDERS
+        from shapely.geometry import mapping as _mapping
+
+        WORLD_BORDERS_GEOJSON = {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": {"iso": iso},
+                    "geometry": _mapping(geom),
+                }
+                for iso, geom in _COUNTRY_BORDERS.items()
+            ],
+        }
+
+    return jsonify(WORLD_BORDERS_GEOJSON)
+
+
 @app.get("/api/border/<iso>")
 def get_border(iso: str):
     from game_logic import _COUNTRY_BORDERS
