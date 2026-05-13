@@ -28,6 +28,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-only-change-me")
 
 ROOMS: dict[str, dict[str, Any]] = {}
 ROUND_TIME_SECONDS = 30
+CATEGORY_PICK_SECONDS = 15
 RESULTS_AUTO_ADVANCE_SECONDS = 15
 ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 ROOM_TTL_MS = 5 * 60 * 1000  # delete rooms inactive for 5 minutes
@@ -91,7 +92,10 @@ def _touch_game_state(state: dict[str, Any]) -> None:
 
 
 def _set_turn_deadline(state: dict[str, Any], *, reset: bool) -> None:
-    if state.get("phase") == "guessing":
+    if state.get("phase") == "category_pick":
+        if reset or not state.get("turn_ends_at_ms"):
+            state["turn_ends_at_ms"] = _now_ms() + CATEGORY_PICK_SECONDS * 1000
+    elif state.get("phase") == "guessing":
         if reset or not state.get("turn_ends_at_ms"):
             state["turn_ends_at_ms"] = _now_ms() + ROUND_TIME_SECONDS * 1000
     else:
@@ -186,6 +190,18 @@ def _sync_room_timeouts(room: dict[str, Any]) -> None:
                     state["players"][i]["disconnected"] = True
                 changed = True
         if changed:
+            _touch_room(room)
+        return
+
+    # Auto-pick a category if the picker does not choose in time.
+    if state.get("phase") == "category_pick":
+        _set_turn_deadline(state, reset=False)
+        if _now_ms() >= state.get("turn_ends_at_ms", 0):
+            _clear_transient_events(state)
+            state = start_round(state, chosen_mode=random.choice(QUESTION_MODES))
+            _set_turn_deadline(state, reset=True)
+            _touch_game_state(state)
+            room["game"] = state
             _touch_room(room)
         return
 

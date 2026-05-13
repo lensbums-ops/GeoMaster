@@ -393,7 +393,7 @@ function renderClue(question) {
 
   if (mode === 'detective_city') {
     const revealed = currentState?.detective_progress?.revealed_clues ?? item.detective_clues.length;
-    const multiplier = currentState?.detective_progress?.score_multiplier ?? 3;
+    const multiplier = currentState?.detective_progress?.score_multiplier ?? 1.5;
     detectiveMeta.textContent = `Clues used: ${revealed}/3 · Current score multiplier: ×${multiplier}`;
     detectiveBtn.disabled = !currentState?.can_guess || revealed >= 3;
     detectiveBtn.textContent = revealed >= 3 ? 'All clues revealed' : 'Reveal next clue';
@@ -480,8 +480,8 @@ function renderGameChrome(state) {
     document.getElementById('current-player-label').textContent = `${picker.name} chooses the mode`;
     document.getElementById('streak-fire').style.display = picker.streak >= 3 ? 'inline' : 'none';
     document.getElementById('turn-sub').textContent = state.can_choose_category
-      ? 'You are the round picker — choose the next clue type.'
-      : `Waiting for ${picker.name} to choose the category.`;
+      ? 'You are the round picker — choose the next clue type before time runs out.'
+      : `Waiting for ${picker.name} to choose the category. A random mode starts if time runs out.`;
   } else if (state.phase === 'guessing') {
     const viewer = state.players[state.viewer_index];
     const submitted = (state.round_guesses || []).length;
@@ -526,7 +526,7 @@ function setGuessControlsForState(state) {
       ? 'Marker placed — use jokers or confirm.'
       : 'Click anywhere on the map to place your guess.';
     document.getElementById('ctrl-note').textContent = state.question?.mode === 'detective_city'
-      ? 'Use 1 clue for ×3, 2 clues for ×2, all 3 clues for ×1.'
+      ? 'Use 1 clue for ×1.5, 2 clues for ×1, all 3 clues for ×0.75.'
       : 'Results appear only after everybody has guessed.';
   } else {
     confirmBtn.disabled = true;
@@ -543,7 +543,7 @@ function showCategoryPicker(state) {
   document.getElementById('cat-dot').style.background = picker.color;
   if (state.can_choose_category) {
     document.getElementById('cat-title').textContent = `${picker.name} — choose a category`;
-    document.getElementById('cat-sub').textContent = `Round ${state.current_round} of ${state.rounds} · Pick the clue type.`;
+    document.getElementById('cat-sub').textContent = `Round ${state.current_round} of ${state.rounds} · Pick the clue type before time runs out.`;
 
     grid.innerHTML = '';
     CATEGORY_DEFS.forEach(cat => {
@@ -562,7 +562,7 @@ function showCategoryPicker(state) {
     });
   } else {
     document.getElementById('cat-title').textContent = `${picker.name} is choosing the next mode`;
-    document.getElementById('cat-sub').textContent = 'Waiting for the round picker to make the call.';
+    document.getElementById('cat-sub').textContent = 'Waiting for the round picker. A random mode starts if time runs out.';
     grid.innerHTML = `
       <div class="cat-btn" style="grid-column:1 / -1; cursor:default; opacity:.9;">
         <span class="cat-icon">⏳</span>
@@ -613,7 +613,7 @@ function processState(state) {
 
   if (state.phase === 'category_pick') {
     showScreen('screen-game');
-    stopTimer();
+    startTimer(state.turn_ends_at_ms, false);
     // Only rebuild the category grid when something actually changed —
     // rebuilding on every poll would destroy buttons mid-click.
     if (phaseChanged || versionChanged) {
@@ -711,7 +711,9 @@ async function showResultsScreen(state) {
     if (isClosest && !isPerfect) badges.push('<span class="rc-badge badge-winner">🏆 Closest</span>');
     if (isPerfect) badges.push('<span class="rc-badge badge-perfect">🎯 Perfect</span>');
     if (g.joker_double) badges.push('<span class="rc-badge badge-double">×2 Joker</span>');
-    if ((g.detective_multiplier ?? 1) > 1) badges.push(`<span class="rc-badge badge-double">🕵️ ×${g.detective_multiplier}</span>`);
+    if (q.mode === 'detective_city' && (g.detective_multiplier ?? 1) !== 1) {
+      badges.push(`<span class="rc-badge badge-double">🕵️ ×${g.detective_multiplier}</span>`);
+    }
     if ((state.players[g.player_index].streak ?? 0) >= 3) badges.push('<span class="rc-badge badge-streak">🔥 Streak</span>');
     if (g.timed_out) badges.push('<span class="rc-badge badge-phantom">Phantom</span>');
     const detectiveNote = q.mode === 'detective_city'

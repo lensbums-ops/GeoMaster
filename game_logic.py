@@ -61,7 +61,7 @@ STREAK_REQUIRED = 3          # rounds in a row needed to earn bonus
 STREAK_BONUS_PTS = 500
 TIMEOUT_PENALTY_PTS = 500
 DETECTIVE_MAX_CLUES = 3
-DETECTIVE_MULTIPLIERS = {1: 3, 2: 2, 3: 1}
+DETECTIVE_MULTIPLIERS = {1: 1.5, 2: 1.0, 3: 0.75}
 
 
 # Maths helpers
@@ -246,7 +246,7 @@ def build_question(mode: str, state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _fresh_detective_progress() -> dict[str, int]:
+def _fresh_detective_progress() -> dict[str, int | float]:
     return {
         "revealed_clues": 1,
         "score_multiplier": DETECTIVE_MULTIPLIERS[1],
@@ -416,7 +416,7 @@ def evaluate_guess(
             if question["mode"] == "detective_city"
             else 1
         )
-        base_score *= detective_multiplier
+        base_score = round(base_score * detective_multiplier)
 
         # ×2 joker
         double_used = player.pop("joker_double_active", False)
