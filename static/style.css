@@ -408,9 +408,9 @@ button { border: none; cursor: pointer; transition: .15s ease; }
 .ctrl-note { text-align: center; font-size: 11px; color: rgba(255,255,255,.35); margin-top: 8px; line-height: 1.4; }
 
 /* ══ RESULTS SCREEN ═════════════════════════════════════════════════════════ */
-#screen-results { flex-direction: column; background: var(--bg); min-height: 100vh; }
-.results-map-wrap { flex: 1; position: relative; min-height: 0; }
-#results-map { width: 100%; height: 100%; min-height: 380px; }
+#screen-results { flex-direction: column; background: var(--bg); height: 100vh; min-height: 100vh; overflow: hidden; }
+.results-map-wrap { flex: 1 1 0; display: flex; position: relative; min-height: 320px; }
+#results-map { flex: 1 1 auto; width: 100%; min-height: 0; }
 .country-result-label {
   color: var(--label-color);
   font-size: 13px;
@@ -455,7 +455,7 @@ button { border: none; cursor: pointer; transition: .15s ease; }
   border-radius: 999px; padding: 8px 16px; font-size: 14px; font-weight: 700; color: var(--gold);
 }
 .reveal-step { background: rgba(7,12,24,.88); border: 1px solid rgba(255,255,255,.12); border-radius: 999px; padding: 8px 14px; font-size: 13px; color: rgba(255,255,255,.75); }
-.results-panel { background: var(--panel); border-top: 1px solid rgba(255,255,255,.08); padding: 20px 24px; overflow-y: auto; max-height: 42vh; }
+.results-panel { flex: 0 0 auto; background: var(--panel); border-top: 1px solid rgba(255,255,255,.08); padding: 20px 24px; overflow-y: auto; max-height: 42vh; }
 .results-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
 .results-head h2 { font-size: 22px; font-weight: 800; }
 .rnd-badge { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,.4); }
