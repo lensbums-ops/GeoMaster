@@ -201,6 +201,9 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# Local assistant/editor settings
+.claude/
+
 # Marimo
 marimo/_static/
 marimo/_lsp/
