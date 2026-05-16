@@ -1,5 +1,7 @@
 # GeoMaster
 
+**Live:** https://geomasterdeluxe.onrender.com/
+
 A real-time multiplayer geography guessing game. All game logic runs in Python; the browser handles map display and API calls.
 
 ## Features
@@ -59,19 +61,30 @@ geomaster/
 
 ## Local setup
 
-```bash
-# 1. Install dependencies
-pip install -r requirements.txt
+### macOS
 
-# 2. Generate country border polygons (only needed if country_borders.json is missing or being regenerated)
-python3 prepare_borders.py
+1. Open **Terminal** (`Cmd + Space` → "Terminal")
+2. Navigate to the project folder: `cd path/to/geomaster`
+3. Install dependencies: `python3 -m pip install -r requirements.txt`
+4. Start the server: `PORT=8080 python3 app.py`
+   > macOS reserves port 5000 for AirPlay — use 8080 instead.
+5. Open `http://localhost:8080` in your browser.
 
-# 3. Run the server
-python3 app.py
+### Windows
 
-# 4. Open in browser
-http://127.0.0.1:5000
-```
+1. Open **Command Prompt** or **PowerShell**
+2. Navigate to the project folder: `cd path\to\geomaster`
+3. Install dependencies: `pip install -r requirements.txt`
+   (If `pip` not found: `python -m pip install -r requirements.txt`)
+4. Start the server: `python app.py`
+5. Open `http://localhost:5000` in your browser.
+
+### Testing multiplayer locally
+
+Open the game in two browser windows:
+- **Window 1** (normal): create a room, note the room code
+- **Window 2** (incognito): join using that code
+- Click **Start** in Window 1
 
 ## Deploy to Render
 
