@@ -1083,7 +1083,7 @@ function nearLng(refLng, targetLng) {
 }
 
 function flagEmoji(iso) {
-  return iso.toUpperCase().split('').map(c => String.fromCodePoint(c.charCodeAt(0) + 127397)).join('');
+  return `<img src="https://flagcdn.com/w160/${iso.toLowerCase()}.png" alt="${iso.toUpperCase()} flag" style="height:80px;width:auto;border-radius:4px;">`;
 }
 
 function showScreen(id) {

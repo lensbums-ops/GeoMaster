@@ -356,7 +356,7 @@ button { border: none; cursor: pointer; transition: .15s ease; }
 #detective-hint-btn {
   width: 100%;
 }
-.flag-big { text-align: center; font-size: 72px; line-height: 1.1; padding: 4px 0; }
+.flag-big { text-align: center; line-height: 1.1; padding: 4px 0; }
 .cap-box {
   text-align: center; padding: 12px; border-radius: 12px;
   background: rgba(78,161,255,.1); border: 1px solid rgba(78,161,255,.2);
