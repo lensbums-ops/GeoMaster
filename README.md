@@ -7,20 +7,20 @@ A real-time multiplayer geography guessing game. All game logic runs in Python; 
 
 ## Features
 
-- **Simultaneous multiplayer** — all players guess at the same time, no waiting for turns
-- **Room-based online play** — create a room, share the code or invite link, play from separate browsers
-- **7 question modes** — Country Flag, Country Capital, Country Stats, Country Landmark, City Name, City Facts, Detective City
-- **Real country borders** — country scoring uses actual polygon boundaries (Natural Earth 110 m) when available, not just a radius circle
-- **30-second timer** — placed markers are auto-submitted when time runs out; no guess = phantom + penalty
-- **Streaks** — 3 consecutive rounds under 1 000 km earns +500 pts and a fire indicator
-- **Jokers** — each player gets one Double Points (×2) and one Peek (shows target border for 3 s) per game
-- **Rematch voting** — all remaining players must vote to replay; disconnected players are excluded
-- **Mid-game leave** — players can leave at any point; their turn is auto-phantomed and the game continues
-- **Room TTL** — rooms inactive for 5 minutes are automatically deleted from server memory
-- **Invite links** — `/?room=XXXXX` pre-fills the join form and collapses the create section
-- **Synthesised sound effects** — Web Audio API, no external files; mute toggle persisted in localStorage
-- **Antimeridian fix** — map lines always take the short route (no wrap-around the date line)
-- **Clean result reveal** — animated answer star, answer label, guessed-country labels, distance lines, and result cards
+- **Simultaneous multiplayer:** all players guess at the same time, no waiting for turns
+- **Room-based online play:** create a room, share the code or invite link, play from separate browsers
+- **7 question modes:** Country Flag, Country Capital, Country Stats, Country Landmark, City Name, City Facts, Detective City
+- **Real country borders:** country scoring uses actual polygon boundaries (Natural Earth 110 m) when available, not just a radius circle
+- **30-second timer:** placed markers are auto-submitted when time runs out; no guess = phantom + penalty
+- **Streaks:** 3 consecutive rounds under 1 000 km earns +500 pts and a fire indicator
+- **Jokers:** each player gets one Double Points (×2) and one Peek (shows target border for 3 s) per game
+- **Rematch voting:** all remaining players must vote to replay; disconnected players are excluded
+- **Mid-game leave:** players can leave at any point; their turn is auto-phantomed and the game continues
+- **Room TTL:** rooms inactive for 5 minutes are automatically deleted from server memory
+- **Invite links:** `/?room=XXXXX` pre-fills the join form and collapses the create section
+- **Synthesised sound effects:** Web Audio API, no external files; mute toggle persisted in localStorage
+- **Antimeridian fix:** map lines always take the short route (no wrap-around the date line)
+- **Clean result reveal:** animated answer star, answer label, guessed-country labels, distance lines, and result cards
 
 ## Folder structure
 
