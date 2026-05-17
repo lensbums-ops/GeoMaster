@@ -2,6 +2,7 @@
 
 **Live:** https://geomasterdeluxe.onrender.com/
 **GitHub:** [lensbums-ops/GeoMaster](https://github.com/lensbums-ops/GeoMaster)
+**Demo:** [GeoMaster_Video](https://novasbe365-my.sharepoint.com/:v:/g/personal/73334_novasbe_pt/IQBRtyHXvHgdQbSvHAjwGqJRAUS3LTbPvHX9EOWkSMn3bh8?nav=eyJyZWZlcnJhbEluZm8iOnsicmVmZXJyYWxBcHAiOiJPbmVEcml2ZUZvckJ1c2luZXNzIiwicmVmZXJyYWxBcHBQbGF0Zm9ybSI6IldlYiIsInJlZmVycmFsTW9kZSI6InZpZXciLCJyZWZlcnJhbFZpZXciOiJNeUZpbGVzTGlua0NvcHkifX0&e=TtS2Lv)
 
 A real-time multiplayer geography guessing game. All game logic runs in Python; the browser handles map display and API calls.
 
